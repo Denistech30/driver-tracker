@@ -22,13 +22,11 @@ function Layout() {
       <header className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b pb-2 w-full mb-6">
         <div className="container mx-auto p-4 max-w-4xl flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-              </svg>
+            <div className="h-9 w-9 rounded-full flex items-center justify-center overflow-hidden">
+              <img src="/pwa-192x192 (2).png" alt="Xpense Logo" className="h-full w-full object-contain" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white hidden sm:inline">Driver Expense & Revenue Tracker</h1>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:hidden">Driver Tracker</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white hidden sm:inline">Xpense</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:hidden">Xpense</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <NavLink 
