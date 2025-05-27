@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're Offline - Driver Tracker</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <style>
+    :root {
+      --primary-color: #E11D48;
+      --primary-hover: #be123c;
+      --text-main: #111827;
+      --text-secondary: #6b7280;
+      --bg-color: #f9fafb;
+      --card-bg: #ffffff;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 16px;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+    
+    .offline-container {
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      padding: 2rem;
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .icon-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
+    
+    .icon {
+      width: 60px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(225, 29, 72, 0.1);
+      border-radius: 50%;
+      color: var(--primary-color);
+      font-size: 2rem;
+    }
+    
+    h1 {
+      margin: 0 0 1rem 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    
+    p {
+      margin: 0 0 1.5rem 0;
+      color: var(--text-secondary);
+    }
+    
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      padding: 0.75rem;
+      background-color: rgba(225, 29, 72, 0.1);
+      border-radius: 8px;
+    }
+    
+    .status-indicator-dot {
+      width: 10px;
+      height: 10px;
+      background-color: var(--primary-color);
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    
+    .status-text {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--primary-color);
+    }
+    
+    .btn {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    .btn:hover {
+      background-color: var(--primary-hover);
+    }
+    
+    .footer {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    
+    @keyframes pulse {
+      0% {
+        opacity: 0.6;
+        transform: scale(0.8);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      100% {
+        opacity: 0.6;
+        transform: scale(0.8);
+      }
+    }
+    
+    .feature-list {
+      text-align: left;
+      margin: 1.5rem 0;
+      padding-left: 1.5rem;
+    }
+    
+    .feature-list li {
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <div class="icon-container">
+      <div class="icon">⚠️</div>
+    </div>
+    <h1>You're currently offline</h1>
+    <p>The Driver Tracker app requires an internet connection to sync your financial data.</p>
+    
+    <div class="status-indicator">
+      <div class="status-indicator-dot"></div>
+      <span class="status-text">Waiting for connection...</span>
+    </div>
+    
+    <p>While you're offline, you can:</p>
+    <ul class="feature-list">
+      <li>View previously loaded data (if available in cache)</li>
+      <li>Prepare transactions to sync when you're back online</li>
+      <li>Access your recent reports (if previously viewed)</li>
+    </ul>
+    
+    <button class="btn" onclick="window.location.reload()">Try reconnecting</button>
+    
+    <div class="footer">
+      Driver Tracker App &copy; 2025
+    </div>
+  </div>
+  
+  <script>
+    // Check for network connectivity
+    function updateOnlineStatus() {
+      if (navigator.onLine) {
+        document.querySelector('.status-text').textContent = 'Connection detected!';
+        document.querySelector('.status-indicator').style.backgroundColor = 'rgba(22, 163, 74, 0.1)';
+        document.querySelector('.status-indicator-dot').style.backgroundColor = '#16a34a';
+        
+        // Reload the page after a short delay to show the user we detected their connection
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    
+    // Check status periodically
+    setInterval(updateOnlineStatus, 5000);
+    
+    // Initial check
+    updateOnlineStatus();
+  </script>
+</body>
+</html>
