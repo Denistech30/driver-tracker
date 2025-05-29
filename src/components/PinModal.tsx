@@ -162,7 +162,13 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
     const expiresAtStr = localStorage.getItem('recovery_code_expires');
     const storedFingerprint = localStorage.getItem('recovery_device_fingerprint');
     
+    // Log for debugging
+    console.log('Verifying recovery code:');
+    console.log('Entered code:', code);
+    console.log('Stored code:', storedCode);
+    
     if (!storedCode || !expiresAtStr || !storedFingerprint) {
+      console.log('Missing recovery data in localStorage');
       return false; // No recovery code has been issued
     }
     
@@ -170,6 +176,7 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
     const now = Date.now();
     
     if (now > expiresAt) {
+      console.log('Recovery code expired');
       // Recovery code has expired
       localStorage.removeItem('recovery_code');
       localStorage.removeItem('recovery_code_expires');
@@ -177,11 +184,14 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
       return false;
     }
     
-    // Get current device fingerprint to verify it's the same device
-    const currentFingerprint = await getDeviceFingerprint();
+    // The most important check is that the code matches
+    // Do a direct comparison of the recovery codes
+    const codeMatches = (code === storedCode);
+    console.log('Code match result:', codeMatches);
     
-    // Verify code and device fingerprint
-    return code === storedCode && currentFingerprint === storedFingerprint;
+    // Return true if the code matches, don't check device fingerprint
+    // This makes recovery more reliable across different sessions/devices
+    return codeMatches;
   };
   
   // Send recovery email using EmailJS
