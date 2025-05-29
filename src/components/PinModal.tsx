@@ -47,6 +47,7 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
   
   // Recovery mode states
   const [isInRecoveryMode, setIsInRecoveryMode] = useState(false);
+  const [isFromRecovery, setIsFromRecovery] = useState(false); // Flag to track if user is coming from recovery
   const [recoveryCode, setRecoveryCode] = useState('');
   
   // Effect for recovery email initialization
@@ -345,8 +346,8 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
         }
       }
       
-      // For PIN change, verify old PIN first
-      if (mode === 'change') {
+      // For PIN change, verify old PIN first (skip if coming from recovery flow)
+      if (mode === 'change' && !isFromRecovery) {
         if (pin.length !== 4) {
           setError('Please enter your current PIN to confirm the change.');
           return;
@@ -381,6 +382,7 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
         setPin('');
         setNewPin('');
         setConfirmNewPin('');
+        setIsFromRecovery(false); // Reset recovery flag after successful change
       } catch (error) {
         console.error('PIN setup error:', error);
         setError('An error occurred. Please try again.');
@@ -577,6 +579,7 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
                         // Switch to PIN setup mode
                         setTimeout(() => {
                           setIsInRecoveryMode(false);
+                          setIsFromRecovery(true); // Set flag to skip PIN verification
                           setMode('change');
                         }, 1500);
                       } else {
