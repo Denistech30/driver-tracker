@@ -52,25 +52,25 @@ function Calendar() {
 
   return (
     <section className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">Transaction Calendar</h2>
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Transaction Calendar</h2>
       <div className="bg-card shadow-sm rounded-lg p-4">
         <div className="flex justify-between items-center mb-4">
           <button
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            className="p-2 rounded-full hover:bg-gray-100"
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
             aria-label="Previous month"
           >
-            <ChevronLeft className="h-5 w-5 text-gray-900" />
+            <ChevronLeft className="h-5 w-5 text-gray-900 dark:text-gray-100" />
           </button>
-          <h3 className="text-lg font-medium text-gray-900">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
             {format(currentMonth, 'MMMM yyyy')}
           </h3>
           <button
             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            className="p-2 rounded-full hover:bg-gray-100"
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
             aria-label="Next month"
           >
-            <ChevronRight className="h-5 w-5 text-gray-900" />
+            <ChevronRight className="h-5 w-5 text-gray-900 dark:text-gray-100" />
           </button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-sm font-medium text-muted-foreground">
@@ -91,7 +91,7 @@ function Calendar() {
               } ${
                 selectedDate && isSameDay(day, selectedDate)
                   ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-gray-100'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
               aria-label={`Select ${formatDate(day)}`}
             >
@@ -102,11 +102,11 @@ function Calendar() {
       </div>
       {selectedDate && (
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
             Transactions for {formatDate(selectedDate)}
           </h3>
           {transactionsForDate.length === 0 ? (
-            <p className="text-gray-500 text-center">No transactions for this date.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-center">No transactions for this date.</p>
           ) : (
             <div className="space-y-3 card-grid-sm">
               {transactionsForDate.map((transaction) => (
@@ -116,10 +116,10 @@ function Calendar() {
                 >
                   <div className="flex justify-between items-center">
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium text-gray-900 text-truncate-sm">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100 text-truncate-sm">
                         {transaction.category}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground dark:text-gray-400">
                         {transaction.description || 'No description'}
                       </span>
                     </div>

@@ -315,7 +315,7 @@ function Reports() {
             </div>
 
             {/* Category Breakdown */}
-            <h3 className="text-lg font-semibold text-gray-900 pt-4">Category Breakdown</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 pt-4">Category Breakdown</h3>
             <div className="overflow-x-auto">
               <table className="w-full table-auto border-collapse">
                 <thead>
@@ -337,19 +337,19 @@ function Reports() {
                 <tbody>
                   {reportData.categories.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-2 text-center text-gray-500">
+                      <td colSpan={4} className="px-4 py-2 text-center text-gray-500 dark:text-gray-400">
                         No category data for this month.
                       </td>
                     </tr>
                   ) : (
                     reportData.categories.map((cat, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-4 py-2 text-sm text-gray-900">{cat.name}</td>
-                        <td className="px-4 py-2 text-sm text-gray-900 capitalize">{cat.type}</td>
-                        <td className="px-4 py-2 text-sm text-right text-gray-900">
+                      <tr key={index} className="border-t dark:border-gray-700">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{cat.name}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100 capitalize">{cat.type}</td>
+                        <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-gray-100">
                           {formatCurrency(cat.amount)}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-900">{cat.description || '-'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">{cat.description || '-'}</td>
                       </tr>
                     ))
                   )}
@@ -358,7 +358,7 @@ function Reports() {
             </div>
 
             {/* Daily Performance */}
-            <h3 className="text-lg font-semibold text-gray-900 pt-4">Daily Performance</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 pt-4">Daily Performance</h3>
             <div className="overflow-x-auto">
               <table className="w-full table-auto border-collapse">
                 <thead>
@@ -373,20 +373,20 @@ function Reports() {
                 <tbody>
                   {dailyPerformanceData.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-2 text-center text-gray-500">
+                      <td colSpan={5} className="px-4 py-2 text-center text-gray-500 dark:text-gray-400">
                         No daily transaction data for this month.
                       </td>
                     </tr>
                   ) : (
                     dailyPerformanceData.map((day, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-4 py-2 text-sm text-gray-900">
+                      <tr key={index} className="border-t dark:border-gray-700">
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
                           {format(parse(day.date, 'yyyy-MM-dd', new Date()), 'MMM dd, yyyy')}
                         </td>
-                        <td className="px-4 py-2 text-sm text-right text-gray-900">
+                        <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-gray-100">
                           {formatCurrency(day.revenue)}
                         </td>
-                        <td className="px-4 py-2 text-sm text-right text-gray-900">
+                        <td className="px-4 py-2 text-sm text-right text-gray-900 dark:text-gray-100">
                           {formatCurrency(day.expenses)}
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-bold"

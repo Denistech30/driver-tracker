@@ -53,7 +53,7 @@ function Transactions() {
   if (isLoading) {
     return (
       <section className="space-y-4">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Transactions</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Transactions</h2>
         <SkeletonLoader type="card" />
       </section>
     );
@@ -67,7 +67,7 @@ function Transactions() {
           <button
             onClick={() => setFilter('all')}
             className={`px-3 py-1 rounded-full text-sm font-medium ${
-              filter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-gray-200 text-gray-700'
+              filter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
             }`}
           >
             All
@@ -75,7 +75,7 @@ function Transactions() {
           <button
             onClick={() => setFilter('revenue')}
             className={`px-3 py-1 rounded-full text-sm font-medium ${
-              filter === 'revenue' ? 'bg-primary text-primary-foreground' : 'bg-gray-200 text-gray-700'
+              filter === 'revenue' ? 'bg-primary text-primary-foreground' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
             }`}
           >
             Revenue
@@ -83,28 +83,28 @@ function Transactions() {
           <button
             onClick={() => setFilter('expense')}
             className={`px-3 py-1 rounded-full text-sm font-medium ${
-              filter === 'expense' ? 'bg-primary text-primary-foreground' : 'bg-gray-200 text-gray-700'
+              filter === 'expense' ? 'bg-primary text-primary-foreground' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
             }`}
           >
             Expense
           </button>
         </div>
         {transactions.length === 0 ? (
-          <p className="text-gray-500 text-center">No transactions found.</p>
+          <p className="text-gray-500 dark:text-gray-400 text-center">No transactions found.</p>
         ) : (
           <div className="space-y-3 card-grid-sm">
             {transactions.map((transaction) => (
               <div
                 key={transaction.id}
-                className="bg-card shadow-sm rounded-lg p-4 hover:bg-muted-50 transition-colors cursor-pointer"
+                className="bg-card shadow-sm rounded-lg p-4 hover:bg-muted-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                 onClick={() => setSelectedTransaction(transaction)}
               >
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-900 text-truncate-sm">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100 text-truncate-sm">
                       {transaction.category}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground dark:text-gray-400">
                       {formatDate(transaction.date)}
                     </span>
                   </div>

@@ -22,6 +22,8 @@ interface ChartData {
   expenses: number;
   netIncome: number;
   expenseCategories: ExpenseCategory[];
+  // Flag to determine if we're viewing expense categories or financial overview
+  viewMode: 'expenses' | 'financial';
 }
 
 function Overview() {
@@ -33,7 +35,8 @@ function Overview() {
     revenue: 0, 
     expenses: 0, 
     netIncome: 0, 
-    expenseCategories: [] 
+    expenseCategories: [],
+    viewMode: 'financial' // Default to showing financial overview
   });
 
   useEffect(() => {
@@ -75,6 +78,7 @@ function Overview() {
         expenses: summary.expenses,
         netIncome: summary.netIncome,
         expenseCategories: enhancedCategories,
+        viewMode: 'expenses', // Add the missing viewMode property with a default value
       });
       setIsLoading(false);
     };
@@ -103,8 +107,15 @@ function Overview() {
   const toggleChartType = () => {
     setChartType(chartType === 'pie' ? 'bar' : 'pie');
   };
+  
+  const toggleViewMode = () => {
+    setData(prev => ({
+      ...prev,
+      viewMode: prev.viewMode === 'expenses' ? 'financial' : 'expenses'
+    }));
+  };
 
-  const pieChartData = {
+  const pieChartData = data.viewMode === 'expenses' ? {
     labels: data.expenseCategories.map((cat) => cat.name),
     datasets: [
       {
@@ -114,9 +125,23 @@ function Overview() {
         borderWidth: 2,
       },
     ],
+  } : {
+    // Financial overview showing revenue vs expenses
+    labels: ['Revenue', 'Expenses'],
+    datasets: [
+      {
+        data: [data.revenue, data.expenses],
+        backgroundColor: [
+          'hsl(150, 80%, 40%)', // Green for revenue
+          'hsl(350, 85%, 50%)'  // Red for expenses
+        ],
+        borderColor: 'hsl(var(--card))',
+        borderWidth: 2,
+      },
+    ],
   };
 
-  const barChartData = {
+  const barChartData = data.viewMode === 'expenses' ? {
     labels: data.expenseCategories.map((cat) => cat.name),
     datasets: [
       {
@@ -124,6 +149,24 @@ function Overview() {
         data: data.expenseCategories.map((cat) => cat.value),
         backgroundColor: data.expenseCategories.map((cat) => cat.color),
         borderColor: data.expenseCategories.map((cat) => cat.color),
+        borderWidth: 1,
+      },
+    ],
+  } : {
+    // Financial overview showing revenue vs expenses
+    labels: ['Revenue', 'Expenses'],
+    datasets: [
+      {
+        label: 'Amount',
+        data: [data.revenue, data.expenses],
+        backgroundColor: [
+          'hsl(150, 80%, 40%)', // Green for revenue
+          'hsl(350, 85%, 50%)'  // Red for expenses
+        ],
+        borderColor: [
+          'hsl(150, 80%, 40%)', // Green for revenue
+          'hsl(350, 85%, 50%)'  // Red for expenses
+        ],
         borderWidth: 1,
       },
     ],
@@ -154,8 +197,16 @@ function Overview() {
         padding: 12,
         cornerRadius: 8,
         callbacks: {
-          label: (context: any) =>
-            `${context.label}: ${formatCurrency(context.raw)} (${context.parsed.toFixed(1)}%)`,
+          label: (context: any) => {
+            if (data.viewMode === 'expenses') {
+              return `${context.label}: ${formatCurrency(context.raw)} (${context.parsed.toFixed(1)}%)`;
+            } else {
+              // For financial overview
+              const total = data.revenue + data.expenses;
+              const percentage = ((context.raw / total) * 100).toFixed(1);
+              return `${context.label}: ${formatCurrency(context.raw)} (${percentage}%)`;
+            }
+          },
         },
       },
     },
@@ -183,8 +234,16 @@ function Overview() {
         padding: 12,
         cornerRadius: 8,
         callbacks: {
-          label: (context: any) =>
-            `${formatCurrency(context.raw)} (${data.expenseCategories[context.dataIndex]?.percentage.toFixed(1)}%)`,
+          label: (context: any) => {
+            if (data.viewMode === 'expenses') {
+              return `${formatCurrency(context.raw)} (${data.expenseCategories[context.dataIndex]?.percentage.toFixed(1)}%)`;
+            } else {
+              // For financial overview
+              const total = data.revenue + data.expenses;
+              const percentage = ((context.raw / total) * 100).toFixed(1);
+              return `${formatCurrency(context.raw)} (${percentage}%)`;
+            }
+          },
         },
       },
     },
@@ -347,19 +406,27 @@ function Overview() {
           </div>
         </div>
 
-        {/* Expense Summary Card */}
+        {/* Financial Summary Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-md font-medium">Expense Summary</CardTitle>
-            <button 
-              onClick={toggleChartType}
-              className="text-xs px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
-            >
-              {chartType === 'pie' ? 'Show Bar Chart' : 'Show Pie Chart'}
-            </button>
+            <CardTitle className="text-md font-medium">{data.viewMode === 'expenses' ? 'Expense Summary' : 'Financial Summary'}</CardTitle>
+            <div className="flex space-x-2">
+              <button 
+                onClick={toggleViewMode}
+                className="text-xs px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+              >
+                {data.viewMode === 'expenses' ? 'Show Financial Overview' : 'Show Expense Categories'}
+              </button>
+              <button 
+                onClick={toggleChartType}
+                className="text-xs px-2 py-1 rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+              >
+                {chartType === 'pie' ? 'Show Bar Chart' : 'Show Pie Chart'}
+              </button>
+            </div>
           </CardHeader>
           <CardContent>
-            {data.expenseCategories.length > 0 ? (
+            {(data.viewMode === 'financial' || data.expenseCategories.length > 0) ? (
               <div className="space-y-6">
                 <div className="relative h-64 mx-auto max-w-sm">
                   {chartType === 'pie' ? (
@@ -369,42 +436,88 @@ function Overview() {
                   )}
                 </div>
                 <div className="mt-6 overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead>
-                      <tr className="border-b dark:border-gray-700">
-                        <th className="px-3 py-2 text-muted-foreground">Category</th>
-                        <th className="px-3 py-2 text-muted-foreground text-right">Amount</th>
-                        <th className="px-3 py-2 text-muted-foreground text-right">Percentage</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.expenseCategories.map((category) => (
-                        <tr key={category.name} className="border-b dark:border-gray-800">
+                  {data.viewMode === 'expenses' ? (
+                    <table className="w-full text-sm text-left">
+                      <thead>
+                        <tr className="border-b dark:border-gray-700">
+                          <th className="px-3 py-2 text-muted-foreground">Category</th>
+                          <th className="px-3 py-2 text-muted-foreground text-right">Amount</th>
+                          <th className="px-3 py-2 text-muted-foreground text-right">Percentage</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.expenseCategories.map((category) => (
+                          <tr key={category.name} className="border-b dark:border-gray-800">
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: category.color }}
+                                />
+                                {category.name}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(category.value)}</td>
+                            <td className="px-3 py-2 text-right">{category.percentage.toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                        <tr className="font-medium bg-muted/30">
+                          <td className="px-3 py-2">Total</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(data.expenses)}</td>
+                          <td className="px-3 py-2 text-right">100%</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  ) : (
+                    <table className="w-full text-sm text-left">
+                      <thead>
+                        <tr className="border-b dark:border-gray-700">
+                          <th className="px-3 py-2 text-muted-foreground">Type</th>
+                          <th className="px-3 py-2 text-muted-foreground text-right">Amount</th>
+                          <th className="px-3 py-2 text-muted-foreground text-right">Percentage</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b dark:border-gray-800">
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-2">
                               <div 
                                 className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: category.color }}
+                                style={{ backgroundColor: 'hsl(150, 80%, 40%)' }}
                               />
-                              {category.name}
+                              Revenue
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-right">{formatCurrency(category.value)}</td>
-                          <td className="px-3 py-2 text-right">{category.percentage.toFixed(1)}%</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(data.revenue)}</td>
+                          <td className="px-3 py-2 text-right">{((data.revenue / (data.revenue + data.expenses)) * 100).toFixed(1)}%</td>
                         </tr>
-                      ))}
-                      <tr className="font-medium bg-muted/30">
-                        <td className="px-3 py-2">Total</td>
-                        <td className="px-3 py-2 text-right">{formatCurrency(data.expenses)}</td>
-                        <td className="px-3 py-2 text-right">100%</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                        <tr className="border-b dark:border-gray-800">
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full" 
+                                style={{ backgroundColor: 'hsl(350, 85%, 50%)' }}
+                              />
+                              Expenses
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(data.expenses)}</td>
+                          <td className="px-3 py-2 text-right">{((data.expenses / (data.revenue + data.expenses)) * 100).toFixed(1)}%</td>
+                        </tr>
+                        <tr className="font-medium bg-muted/30">
+                          <td className="px-3 py-2">Total</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(data.revenue + data.expenses)}</td>
+                          <td className="px-3 py-2 text-right">100%</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             ) : (
               <p className="text-gray-500 text-center py-8">No expenses to display.</p>
             )}
+
           </CardContent>
         </Card>
       </section>
