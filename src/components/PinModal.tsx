@@ -86,6 +86,12 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
     setter(value);
   };
   
+  // Handle recovery code input changes (alphanumeric allowed)
+  const handleRecoveryCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.slice(0, 8); // Limit to 8 characters but allow letters and numbers
+    setRecoveryCode(value);
+  };
+  
   // Function to mask email for privacy in UI
   const maskEmail = (email: string): string => {
     if (!email) return '';
@@ -545,12 +551,10 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
                       id="recovery-code"
                       type="text"
                       value={recoveryCode}
-                      onChange={(e) => setRecoveryCode(e.target.value.replace(/\D/g, '').substring(0, 8))}
-                      placeholder="Enter 8-digit code"
+                      onChange={(e) => setRecoveryCode(e.target.value.substring(0, 8))}
+                      placeholder="Enter 8-character code"
                       className="bg-white dark:bg-gray-800 text-center text-lg tracking-widest"
                       maxLength={8}
-                      pattern="[0-9]*"
-                      inputMode="numeric"
                     />
                   </div>
                   
