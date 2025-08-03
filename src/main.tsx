@@ -6,7 +6,33 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { registerSW } from 'virtual:pwa-register';
 import { Workbox } from 'workbox-window';
+import { updateLastActivityTime } from './lib/notificationService';
 import './index.css';
+
+// Initialize last activity time on app start
+updateLastActivityTime();
+
+// Track user activity
+const handleUserActivity = () => {
+  updateLastActivityTime();};
+
+// Add event listeners for user activity
+['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+  window.addEventListener(event, handleUserActivity, { passive: true });
+});
+
+// Register service worker for notifications
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(registration => {
+        console.log('ServiceWorker registration successful');
+      })
+      .catch(err => {
+        console.error('ServiceWorker registration failed: ', err);
+      });
+  });
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -20,11 +46,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>
 );
 
-// Register service worker for offline functionality
+// Register service worker for PWA functionality
 const updateSW = registerSW({
   // Called when a new service worker has been installed and waiting to activate
   onNeedRefresh() {
-    // Using a custom UI component would be better than the basic confirm dialog
     if (confirm('New version available! Update now for improved features and security?')) {
       updateSW(true);
     }

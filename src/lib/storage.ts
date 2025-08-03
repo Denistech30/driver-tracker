@@ -33,6 +33,28 @@ export function addTransaction(transaction: Omit<Transaction, 'id'>): void {
   }
 }
 
+export function getTransactionById(id: string): Transaction | undefined {
+  try {
+    const transactions = getTransactions();
+    return transactions.find(t => t.id === id);
+  } catch (error) {
+    console.error('Failed to get transaction by ID:', error);
+    return undefined;
+  }
+}
+
+export function updateTransaction(updatedTransaction: Transaction): void {
+  try {
+    let transactions = getTransactions();
+    transactions = transactions.map(t => 
+      t.id === updatedTransaction.id ? updatedTransaction : t
+    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  } catch (error) {
+    console.error('Failed to update transaction:', error);
+  }
+}
+
 export function getSummary() {
   const transactions = getTransactions();
   const revenue = transactions

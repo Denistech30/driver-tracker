@@ -1,0 +1,701 @@
+import React, { useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { useAuth } from '../contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { sendRecoveryEmail, checkInternetConnection } from '../lib/emailService';
+import { useTranslation } from '../hooks/useTranslation';
+
+// Props for the PinModal
+interface PinModalProps {
+  mode: 'unlock' | 'setup' | 'change' | 'disable'; // Controls the modal's behavior
+  onClose?: () => void; // Callback to close the modal when used as a dialog
+  onSuccess?: () => void; // Callback for successful operation (setup/change/disable)
+  availableQuestions: string[]; // List of security questions
+}
+
+const PinModal = ({ mode, onClose, onSuccess, availableQuestions }: PinModalProps): React.ReactElement => {
+  const { auth, verifyPin, verifySecurityQuestion, setPinAndSecurityQuestion, disablePin, unlockApp } = useAuth();
+  const { t } = useTranslation();
+  
+  // State for PIN entry/verification
+  const [pin, setPin] = useState('');
+  const [useQuestion, setUseQuestion] = useState(false);
+  const [question, setQuestion] = useState(auth.securityQuestion || '');
+  const [answer, setAnswer] = useState('');
+  
+  // State for new PIN setup/change
+  const [newPin, setNewPin] = useState('');
+  const [confirmNewPin, setConfirmNewPin] = useState('');
+  const [setupQuestion, setSetupQuestion] = useState(availableQuestions[0] || '');
+  const [setupAnswer, setSetupAnswer] = useState('');
+  const [setupEmail, setSetupEmail] = useState(''); // Required recovery email for PIN setup
+  
+  // UI States
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  
+  // States for failed attempts and lockout
+  const [attempts, setAttempts] = useState(0);
+  const [lockedOut, setLockedOut] = useState(false);
+  const MAX_ATTEMPTS = 3;
+  const LOCKOUT_DURATION_MS = 30 * 1000; // 30 seconds
+  
+  // Recovery mode states
+  const [isInRecoveryMode, setIsInRecoveryMode] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
+  
+  // Effect for recovery email initialization
+  useEffect(() => {
+    if (mode === 'change' && auth.recoveryEmail) {
+      setSetupEmail(auth.recoveryEmail);
+    }
+  }, [mode, auth.recoveryEmail]);
+  
+  // Effect for lockout timer
+  useEffect(() => {
+    if (lockedOut) {
+      const timer = setTimeout(() => {
+        setLockedOut(false);
+        setAttempts(0);
+        setError('');
+      }, LOCKOUT_DURATION_MS);
+      return () => clearTimeout(timer);
+    }
+  }, [lockedOut]);
+  
+  // Effect to initialize question from available questions
+  useEffect(() => {
+    if (availableQuestions.length > 0) {
+      if (!setupQuestion) {
+        setSetupQuestion(availableQuestions[0]);
+      }
+      if (auth.securityQuestion && !question) {
+        setQuestion(auth.securityQuestion);
+      }
+    }
+  }, [availableQuestions, setupQuestion, auth.securityQuestion, question]);
+  
+  // Handle PIN input changes (numeric only)
+  const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+    setter(value);
+  };
+  
+  // Function to mask email for privacy in UI
+  const maskEmail = (email: string): string => {
+    if (!email) return '';
+    
+    const parts = email.split('@');
+    if (parts.length !== 2) return email;
+    
+    const name = parts[0];
+    const domain = parts[1];
+    
+    // Show first character, mask the rest
+    const maskedName = name.charAt(0) + '***';
+    return `${maskedName}@${domain}`;
+  };
+  
+  // Create a device fingerprint for secure recovery
+  const getDeviceFingerprint = async (): Promise<string> => {
+    const screenInfo = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const language = navigator.language;
+    const platform = navigator.platform;
+    const userAgent = navigator.userAgent;
+    const dateNow = new Date().toISOString();
+    
+    // Create fingerprint string
+    const fingerprintData = [
+      screenInfo, timeZone, language, platform, userAgent, dateNow,
+      Object.keys(localStorage).length.toString()
+    ].join('|');
+    
+    // Generate hash
+    let hash = 0;
+    for (let i = 0; i < fingerprintData.length; i++) {
+      hash = ((hash << 5) - hash) + fingerprintData.charCodeAt(i);
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    return hash.toString(16); // Return as hex string
+  };
+  
+  // Generate recovery code for account recovery
+  const generateRecoveryCode = async (): Promise<string> => {
+    if (!auth.recoveryEmail) {
+      throw new Error('No recovery email found');
+    }
+    
+    const timestamp = Date.now();
+    const deviceFingerprint = await getDeviceFingerprint();
+    const emailHash = auth.recoveryEmail.toLowerCase().trim();
+    
+    // Create a unique string
+    const baseString = `${timestamp}-${deviceFingerprint}-${emailHash}`;
+    
+    // Hash it
+    let hash = 0;
+    for (let i = 0; i < baseString.length; i++) {
+      const char = baseString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    
+    // Generate 8-digit code
+    const code = Math.abs(hash % 100000000).toString().padStart(8, '0');
+    
+    // Store with expiration (15 minutes)
+    const validUntil = timestamp + (15 * 60 * 1000);
+    localStorage.setItem('recoveryCode', JSON.stringify({
+      code,
+      email: auth.recoveryEmail,
+      deviceFingerprint,
+      validUntil
+    }));
+    
+    return code;
+  };
+  
+  // Verify recovery code with enhanced security
+  const verifyRecoveryCode = async (code: string): Promise<boolean> => {
+    try {
+      const storedData = localStorage.getItem('recoveryCode');
+      if (!storedData) return false;
+      
+      const { code: storedCode, email: storedEmail, deviceFingerprint: storedFingerprint, validUntil } = JSON.parse(storedData);
+      
+      // Check expiration
+      if (Date.now() >= validUntil) return false;
+      
+      // Check code
+      if (code !== storedCode) return false;
+      
+      // Verify email matches
+      if (!auth.recoveryEmail || auth.recoveryEmail.toLowerCase().trim() !== storedEmail) {
+        return false;
+      }
+      
+      // Verify device (warn but don't fail completely on mismatch)
+      const currentFingerprint = await getDeviceFingerprint();
+      if (currentFingerprint !== storedFingerprint) {
+        console.warn('Device fingerprint changed during recovery');
+      }
+      
+      return true;
+    } catch (e) {
+      console.error('Error verifying recovery code:', e);
+      return false;
+    }
+  };
+  
+  // Send recovery email using EmailJS
+  const sendRecoveryCodeEmail = async (code: string): Promise<boolean> => {
+    if (!auth.recoveryEmail) {
+      setError('No recovery email found. Please contact support.');
+      return false;
+    }
+    
+    // Check internet connection first
+    const isOnline = await checkInternetConnection();
+    
+    if (!isOnline) {
+      setError('No internet connection available to send recovery email. Please connect to the internet and try again.');
+      return false;
+    }
+    
+    try {
+      // Show sending status
+      setMessage('Sending recovery email... Please wait.');
+      
+      // Send actual email using EmailJS
+      const sent = await sendRecoveryEmail(auth.recoveryEmail, code);
+      
+      if (sent) {
+        return true;
+      } else {
+        setError('Failed to send recovery email. Please try again later.');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error sending recovery email:', error);
+      setError('An error occurred while sending the recovery email. Please try again later.');
+      return false;
+    }
+  };
+  
+  // Handle unlock request (when user enters PIN or security question)
+  const handleUnlock = async (): Promise<void> => {
+    setError('');
+    setMessage('');
+    
+    if (lockedOut) {
+      setError(`Too many failed attempts. Please wait ${LOCKOUT_DURATION_MS / 1000} seconds.`);
+      return;
+    }
+    
+    let success = false;
+    
+    if (useQuestion) {
+      // Verify with security question
+      if (!question || !answer.trim()) {
+        setError('Please select a question and provide an answer.');
+        return;
+      }
+      success = await verifySecurityQuestion(question, answer);
+    } else {
+      // Verify with PIN
+      if (pin.length !== 4) {
+        setError('Please enter a 4-digit PIN.');
+        return;
+      }
+      success = await verifyPin(pin);
+    }
+    
+    if (success) {
+      // Successful unlock
+      setPin('');
+      setAnswer('');
+      setAttempts(0);
+      unlockApp();
+    } else {
+      // Failed attempt
+      setAttempts(prev => prev + 1);
+      if (attempts + 1 >= MAX_ATTEMPTS) {
+        setLockedOut(true);
+        setError(`Too many failed attempts. Locked out for ${LOCKOUT_DURATION_MS / 1000} seconds.`);
+      } else {
+        setError(`Invalid ${useQuestion ? 'answer' : 'PIN'}. ${MAX_ATTEMPTS - (attempts + 1)} attempts remaining.`);
+      }
+      setPin('');
+      setAnswer('');
+    }
+  };
+  
+  // Handle account recovery process
+  const handleRecovery = async (): Promise<void> => {
+    setError('');
+    
+    if (!isInRecoveryMode) {
+      // Starting recovery process
+      if (!auth.recoveryEmail) {
+        setError('No recovery email found for this account. Contact support for assistance.');
+        return;
+      }
+      
+      try {
+        // Generate and send recovery code
+        setIsInRecoveryMode(true);
+        const code = await generateRecoveryCode();
+        const sent = await sendRecoveryCodeEmail(code);
+        
+        if (sent) {
+          const maskedEmail = maskEmail(auth.recoveryEmail);
+          setMessage(
+            `Recovery code sent to ${maskedEmail}. ` +
+            `Please check your email and enter the 8-digit code below. ` +
+            `Note: You need internet connection to receive the email.`
+          );
+        } else {
+          setError('Failed to send recovery email. Please check your internet connection.');
+          setIsInRecoveryMode(false);
+        }
+      } catch (error) {
+        console.error('Recovery error:', error);
+        setError('An error occurred during recovery. Please try again.');
+        setIsInRecoveryMode(false);
+      }
+    } else {
+      // Verifying recovery code
+      try {
+        if (recoveryCode.length !== 8) {
+          setError('Please enter the complete 8-digit recovery code.');
+          return;
+        }
+        
+        const isValid = await verifyRecoveryCode(recoveryCode);
+        
+        if (isValid) {
+          // Successful recovery - reset PIN and security info
+          localStorage.removeItem('pin');
+          localStorage.removeItem('securityQuestion');
+          localStorage.removeItem('securityAnswer');
+          localStorage.removeItem('recoveryCode');
+          
+          setMessage('Account reset successful. You can now set up a new PIN.');
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          setError('Invalid or expired recovery code. Please try again.');
+        }
+      } catch (error) {
+        console.error('Verification error:', error);
+        setError('An error occurred during verification. Please try again.');
+      }
+    }
+  };
+  
+  // Handle PIN setup/change/disable (from Settings screen)
+  const handleSubmitPinManagement = async (): Promise<void> => {
+    setError('');
+    setMessage('');
+    
+    if (mode === 'setup' || mode === 'change') {
+      // PIN setup or change
+      
+      // Validate PIN
+      if (newPin.length !== 4) {
+        setError('New PIN must be 4 digits.');
+        return;
+      }
+      
+      // Validate PIN confirmation
+      if (newPin !== confirmNewPin) {
+        setError('New PINs do not match.');
+        return;
+      }
+      
+      // Validate security question/answer
+      if (!setupQuestion || !setupAnswer.trim()) {
+        setError('Please select a security question and provide an answer.');
+        return;
+      }
+      
+      // Validate recovery email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!setupEmail || !emailRegex.test(setupEmail)) {
+        setError('Please provide a valid recovery email address.');
+        return;
+      }
+      
+      // For PIN change, verify current PIN
+      if (mode === 'change') {
+        if (pin.length !== 4) {
+          setError('Please enter your current PIN.');
+          return;
+        }
+        
+        const isCurrentPinValid = await verifyPin(pin);
+        if (!isCurrentPinValid) {
+          setError('Incorrect current PIN.');
+          return;
+        }
+      }
+      
+      // Set/change PIN
+      try {
+        const success = await setPinAndSecurityQuestion(newPin, setupQuestion, setupAnswer, setupEmail);
+        
+        if (success) {
+          setMessage(mode === 'setup' ? 'PIN set successfully!' : 'PIN changed successfully!');
+          onSuccess?.();
+          
+          // Clear inputs
+          setPin('');
+          setNewPin('');
+          setConfirmNewPin('');
+          setSetupQuestion(availableQuestions[0] || '');
+          setSetupAnswer('');
+          setSetupEmail('');
+        } else {
+          setError('Failed to set/change PIN. Please try again.');
+        }
+      } catch (error) {
+        console.error('PIN management error:', error);
+        setError('An error occurred. Please try again.');
+      }
+    } else if (mode === 'disable') {
+      // PIN disable
+      if (pin.length !== 4) {
+        setError('Please enter your current PIN to disable PIN protection.');
+        return;
+      }
+      
+      try {
+        const isValid = await verifyPin(pin);
+        
+        if (isValid) {
+          disablePin();
+          setMessage('PIN protection disabled successfully!');
+          onSuccess?.();
+          setPin('');
+        } else {
+          setError('Incorrect PIN. Cannot disable PIN protection.');
+        }
+      } catch (error) {
+        console.error('PIN disable error:', error);
+        setError('An error occurred. Please try again.');
+      }
+    }
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto pt-10 pb-16 px-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full p-6 mx-auto my-8 relative">
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="text-center">
+            <h2 className="text-xl font-bold">
+              {mode === 'unlock' && t('pin.unlock')}
+              {mode === 'setup' && t('pin.setup')}
+              {mode === 'change' && t('pin.change')}
+              {mode === 'disable' && t('pin.disable')}
+            </h2>
+            {message && <p className="text-green-600 dark:text-green-400 mt-2">{message}</p>}
+            {error && <p className="text-red-500 dark:text-red-400 mt-2">{error}</p>}
+          </div>
+          
+          {/* Content based on mode */}
+          {mode === 'unlock' ? (
+            /* UNLOCK MODE */
+            <>
+              {!isInRecoveryMode ? (
+                /* PIN/Security Question Entry */
+                <>
+                  {!useQuestion ? (
+                    /* PIN Entry */
+                    <div className="space-y-2">
+                      <Label htmlFor="pin">PIN</Label>
+                      <Input
+                        id="pin"
+                        type="password"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={4}
+                        value={pin}
+                        onChange={(e) => handlePinChange(e, setPin)}
+                        placeholder="Enter 4-digit PIN"
+                        disabled={lockedOut}
+                        className="text-center text-lg tracking-widest"
+                      />
+                    </div>
+                  ) : (
+                    /* Security Question Entry */
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="question">Security Question</Label>
+                        <Select value={question} onValueChange={setQuestion} disabled={lockedOut}>
+                          <SelectTrigger id="question">
+                            <SelectValue placeholder="Select a question" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={auth.securityQuestion || ''}>{auth.securityQuestion}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="answer">Answer</Label>
+                        <Input
+                    {/* Account Recovery Button */}
+                    {auth.recoveryEmail && (
+                      <Button
+                        variant="link"
+                        onClick={() => {
+                          if (!isInRecoveryMode && window.confirm(
+                            t('pin.recoveryPrompt')
+                          )) {
+                            handleRecovery();
+                          }
+                        }}
+                        className="text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300"
+                        disabled={lockedOut}
+                      >
+                        {t('pin.recovery')}
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {/* Unlock Button */}
+                  <Button 
+                    onClick={handleUnlock} 
+                    className="w-full" 
+                    disabled={lockedOut || 
+                      (useQuestion && (!question || !answer.trim())) || 
+                      (!useQuestion && pin.length !== 4)}
+                  >
+                    {t('pin.unlock')}
+                  </Button>
+                </>
+              ) : (
+                /* Recovery Mode */
+                <div className="space-y-4">
+                  <p className="text-sm whitespace-pre-line text-gray-800 dark:text-gray-200">{message}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="recovery-code">{t('pin.recoveryCode')}</Label>
+                    <Input
+                      id="recovery-code"
+                      type="text"
+                      value={recoveryCode}
+                      onChange={(e) => setRecoveryCode(e.target.value.replace(/\D/g, '').substring(0, 8))}
+                      placeholder={t('pin.recoveryCode')}
+                      className="bg-white dark:bg-gray-700"
+                      maxLength={8}
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      className="text-center text-lg tracking-widest"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleRecovery} 
+                    className="w-full mt-4" 
+                    disabled={recoveryCode.length !== 8}
+                  >
+                    Verify Recovery Code
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsInRecoveryMode(false);
+                      setRecoveryCode('');
+                      setError('');
+                      setMessage('');
+                    }}
+                    className="w-full mt-2"
+                  >
+                    Cancel Recovery
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            /* SETUP/CHANGE/DISABLE MODES */
+            <>
+              {mode === 'disable' ? (
+                /* Disable PIN Mode */
+                <div className="space-y-4">
+                  <p className="text-sm">Enter your current PIN to disable PIN protection.</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="current-pin">Current PIN</Label>
+                    <Input
+                      id="current-pin"
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={pin}
+                      onChange={(e) => handlePinChange(e, setPin)}
+                      placeholder="Enter 4-digit PIN"
+                      className="text-center text-lg tracking-widest"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Setup/Change PIN Mode */
+                <div className="space-y-4">
+                  {mode === 'change' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="current-pin">Current PIN</Label>
+                      <Input
+                        id="current-pin"
+                        type="password"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={4}
+                        value={pin}
+                        onChange={(e) => handlePinChange(e, setPin)}
+                        placeholder="Enter current PIN"
+                        className="text-center text-lg tracking-widest"
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="new-pin">{mode === 'change' ? 'New PIN' : 'PIN'}</Label>
+                    <Input
+                      id="new-pin"
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={newPin}
+                      onChange={(e) => handlePinChange(e, setNewPin)}
+                      placeholder="Enter 4-digit PIN"
+                      className="text-center text-lg tracking-widest"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-pin">Confirm PIN</Label>
+                    <Input
+                      id="confirm-pin"
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={confirmNewPin}
+                      onChange={(e) => handlePinChange(e, setConfirmNewPin)}
+                      placeholder="Confirm 4-digit PIN"
+                      className="text-center text-lg tracking-widest"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="security-question">{t('pin.securityQuestion')}</Label>
+                    <Select value={setupQuestion} onValueChange={setSetupQuestion}>
+                      <SelectTrigger id="security-question">
+                        <SelectValue placeholder="Select a security question" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableQuestions.map((q) => (
+                          <SelectItem key={q} value={q}>{q}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="security-answer">{t('pin.securityAnswer')}</Label>
+                    <Input
+                      id="security-answer"
+                      type="text"
+                      value={setupAnswer}
+                      onChange={(e) => setSetupAnswer(e.target.value)}
+                      placeholder="Enter your answer"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="recovery-email">{t('pin.recoveryEmail')}</Label>
+                    <Input
+                      id="recovery-email"
+                      type="email"
+                      value={setupEmail}
+                      onChange={(e) => setSetupEmail(e.target.value)}
+                      placeholder={t('pin.recoveryEmail')}
+                      disabled={mode === 'change' && !!auth.recoveryEmail}
+                    />
+                    {mode === 'change' && auth.recoveryEmail && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('pin.recoveryEmailInfo')}
+                      </p>
+                    )}
+                    {mode === 'setup' && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('pin.recoveryEmailInfo')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Action buttons */}
+              <div className="flex justify-between mt-6 pb-4">
+                <Button variant="outline" onClick={onClose} className="flex-1 mr-2">
+                  {t('common.cancel')}
+                </Button>
+                <Button onClick={handleSubmitPinManagement} className="flex-1">
+                  {mode === 'setup' && t('pin.setup')}
+                  {mode === 'change' && t('pin.change')}
+                  {mode === 'disable' && t('pin.disable')}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PinModal;

@@ -60,6 +60,12 @@ export type TranslationKey =
   | 'pin.tryAgain'
   | 'pin.forgotPin'
   | 'pin.recoveryPrompt'
+  | 'pin.incorrectPin'
+  | 'pin.noMatch'
+  | 'pin.resetSuccess'
+  | 'pin.changed'
+  | 'pin.resetError'
+  | 'pin.changeError'
   
   // Categories
   | 'categories.title'
@@ -82,7 +88,36 @@ export type TranslationKey =
   | 'transactions.date'
   | 'transactions.description'
   | 'transactions.type'
-  | 'transactions.noTransactions';
+  | 'transactions.noTransactions'
+
+  // Overview Page
+  | 'overview.budgetAnalysisTitle'
+  | 'overview.setBudgetButton'
+  | 'overview.revenue'
+  | 'overview.expenses'
+  | 'overview.netIncome'
+  | 'overview.expenseSummaryTitle'
+  | 'overview.financialSummaryTitle'
+  | 'overview.toggleFinancialOverview'
+  | 'overview.toggleExpenseCategories'
+  | 'overview.toggleBarChart'
+  | 'overview.togglePieChart'
+  | 'overview.noData'
+  | 'overview.category'
+  | 'overview.percentage'
+  | 'overview.totalExpenses'
+  | 'overview.financialEntryType'
+  | 'overview.totalRevenueDescription'
+  | 'overview.totalExpensesDescription'
+  | 'overview.netIncomeDescription'
+  | 'overview.noDataDescription'
+  | 'overview.amountLabel'
+  | 'overview.subtitle'
+  | 'overview.setBudgetPrompt'
+  // Budget Modal
+  | 'modal.setMonthlyBudgetTitle'
+  | 'form.budgetAmountLabel'
+  | 'form.enterBudgetPlaceholder';
 
 // Define the translation structure
 export interface Translations {
@@ -162,6 +197,12 @@ export const translations: Translations = {
     'pin.tryAgain': 'Try Again',
     'pin.forgotPin': 'Forgot PIN?',
     'pin.recoveryPrompt': 'Initiate secure account recovery? You will need internet access to receive a recovery code via email.',
+    'pin.incorrectPin': 'Incorrect PIN. Please try again.',
+    'pin.noMatch': 'PINs do not match.',
+    'pin.resetSuccess': 'PIN reset successfully!',
+    'pin.changed': 'PIN changed successfully!',
+    'pin.resetError': 'Failed to reset PIN. Please try again.',
+    'pin.changeError': 'Failed to change PIN. Please try again.',
     
     // Categories
     'categories.title': 'Manage Categories',
@@ -184,7 +225,36 @@ export const translations: Translations = {
     'transactions.date': 'Date',
     'transactions.description': 'Description',
     'transactions.type': 'Type',
-    'transactions.noTransactions': 'No transactions found.'
+    'transactions.noTransactions': 'No transactions found.',
+    
+    // Overview Page
+    'overview.budgetAnalysisTitle': 'Budget Analysis',
+    'overview.setBudgetButton': 'Set Budget',
+    'overview.revenue': 'Revenue',
+    'overview.expenses': 'Expenses',
+    'overview.netIncome': 'Net Income',
+    'overview.expenseSummaryTitle': 'Expense Summary',
+    'overview.financialSummaryTitle': 'Financial Summary',
+    'overview.toggleFinancialOverview': 'Show Financial Overview',
+    'overview.toggleExpenseCategories': 'Show Expense Categories',
+    'overview.toggleBarChart': 'Show Bar Chart',
+    'overview.togglePieChart': 'Show Pie Chart',
+    'overview.noData': 'No data to display',
+    'overview.category': 'Category',
+    'overview.percentage': 'Percentage',
+    'overview.totalExpenses': 'Total Expenses',
+    'overview.financialEntryType': 'Type',
+    'overview.totalRevenueDescription': 'Total income generated',
+    'overview.totalExpensesDescription': 'Total money spent',
+    'overview.netIncomeDescription': 'Revenue minus expenses',
+    'overview.noDataDescription': 'Start by adding some transactions.',
+    'overview.amountLabel': 'Amount',
+    'overview.subtitle': 'Here\'s your financial snapshot for {period}',
+    'overview.setBudgetPrompt': 'Set your budget to see an analysis of your spending habits.',
+    // Budget Modal
+    'modal.setMonthlyBudgetTitle': 'Set Monthly Budget',
+    'form.budgetAmountLabel': 'Budget Amount',
+    'form.enterBudgetPlaceholder': 'Enter your budget',
   },
   
   'es-ES': {
@@ -240,6 +310,12 @@ export const translations: Translations = {
     'pin.recoveryCode': 'Código de recuperación',
     'pin.recoveryCodeInfo': 'Introduce el código de recuperación enviado a tu correo. El código es válido durante 15 minutos.',
     'pin.securityQuestion': 'Pregunta de seguridad',
+    'pin.incorrectPin': 'PIN incorrecto. Inténtalo de nuevo.',
+    'pin.noMatch': 'Los PIN no coinciden.',
+    'pin.resetSuccess': '¡PIN restablecido con éxito!',
+    'pin.changed': '¡PIN cambiado con éxito!',
+    'pin.resetError': 'Error al restablecer el PIN. Inténtalo de nuevo.',
+    'pin.changeError': 'Error al cambiar el PIN. Inténtalo de nuevo.',
     'pin.securityAnswer': 'Respuesta de seguridad',
     'pin.recoverySuccess': '¡Recuperación exitosa! Por favor, establece un nuevo PIN.',
     'pin.recoveryFailed': 'Recuperación fallida. Por favor, inténtalo de nuevo.',
@@ -271,7 +347,36 @@ export const translations: Translations = {
     'transactions.date': 'Fecha',
     'transactions.description': 'Descripción',
     'transactions.type': 'Tipo',
-    'transactions.noTransactions': 'No se encontraron transacciones.'
+    'transactions.noTransactions': 'No se encontraron transacciones.',
+    
+    // Overview Page
+    'overview.budgetAnalysisTitle': 'Análisis de Presupuesto',
+    'overview.setBudgetButton': 'Establecer Presupuesto',
+    'overview.revenue': 'Ingresos',
+    'overview.expenses': 'Gastos',
+    'overview.netIncome': 'Ingresos Netos',
+    'overview.expenseSummaryTitle': 'Resumen de Gastos',
+    'overview.financialSummaryTitle': 'Resumen Financiero',
+    'overview.toggleFinancialOverview': 'Mostrar Resumen Financiero',
+    'overview.toggleExpenseCategories': 'Mostrar Categorías de Gastos',
+    'overview.toggleBarChart': 'Mostrar Gráfico de Barras',
+    'overview.togglePieChart': 'Mostrar Gráfico Circular',
+    'overview.noData': 'No hay datos para mostrar',
+    'overview.category': 'Categoría',
+    'overview.percentage': 'Porcentaje',
+    'overview.totalExpenses': 'Gastos Totales',
+    'overview.financialEntryType': 'Tipo',
+    'overview.totalRevenueDescription': 'Ingresos totales generados',
+    'overview.totalExpensesDescription': 'Dinero total gastado',
+    'overview.netIncomeDescription': 'Ingresos menos gastos',
+    'overview.noDataDescription': 'Comience agregando algunas transacciones.',
+    'overview.amountLabel': 'Monto',
+    'overview.subtitle': 'Este es tu resumen financiero para {period}',
+    'overview.setBudgetPrompt': 'Establezca su presupuesto para ver un análisis de sus hábitos de gasto.',
+    // Budget Modal
+    'modal.setMonthlyBudgetTitle': 'Establecer Presupuesto Mensual',
+    'form.budgetAmountLabel': 'Monto del Presupuesto',
+    'form.enterBudgetPlaceholder': 'Ingrese su presupuesto',
   },
   
   'fr-FR': {
@@ -316,6 +421,12 @@ export const translations: Translations = {
     
     // PIN Security
     'pin.setup': 'Configurer le PIN',
+    'pin.incorrectPin': 'PIN incorrect. Veuillez réessayer.',
+    'pin.noMatch': 'Les PINs ne correspondent pas.',
+    'pin.resetSuccess': 'PIN réinitialisé avec succès !',
+    'pin.changed': 'PIN changé avec succès !',
+    'pin.resetError': 'Échec de la réinitialisation du PIN. Veuillez réessayer.',
+    'pin.changeError': 'Échec du changement de PIN. Veuillez réessayer.',
     'pin.change': 'Changer le PIN',
     'pin.disable': 'Désactiver le PIN',
     'pin.unlock': 'Entrer le PIN',
@@ -358,7 +469,36 @@ export const translations: Translations = {
     'transactions.date': 'Date',
     'transactions.description': 'Description',
     'transactions.type': 'Type',
-    'transactions.noTransactions': 'Aucune transaction trouvée.'
+    'transactions.noTransactions': 'Aucune transaction trouvée.',
+    
+    // Overview Page
+    'overview.budgetAnalysisTitle': 'Analyse du Budget',
+    'overview.setBudgetButton': 'Définir le Budget',
+    'overview.revenue': 'Revenus',
+    'overview.expenses': 'Dépenses',
+    'overview.netIncome': 'Revenu Net',
+    'overview.expenseSummaryTitle': 'Résumé des Dépenses',
+    'overview.financialSummaryTitle': 'Résumé Financier',
+    'overview.toggleFinancialOverview': 'Afficher le Résumé Financier',
+    'overview.toggleExpenseCategories': 'Afficher les Catégories de Dépenses',
+    'overview.toggleBarChart': 'Afficher le Diagramme à Barres',
+    'overview.togglePieChart': 'Afficher le Diagramme Circulaire',
+    'overview.noData': 'Aucune donnée à afficher',
+    'overview.category': 'Catégorie',
+    'overview.percentage': 'Pourcentage',
+    'overview.totalExpenses': 'Dépenses Totales',
+    'overview.financialEntryType': 'Type',
+    'overview.totalRevenueDescription': 'Revenu total généré',
+    'overview.totalExpensesDescription': 'Argent total dépensé',
+    'overview.netIncomeDescription': 'Revenus moins dépenses',
+    'overview.noDataDescription': 'Commencez par ajouter quelques transactions.',
+    'overview.amountLabel': 'Montant',
+    'overview.subtitle': 'Voici votre aperçu financier pour {period}',
+    'overview.setBudgetPrompt': 'Définissez votre budget pour voir une analyse de vos habitudes de dépenses.',
+    // Budget Modal
+    'modal.setMonthlyBudgetTitle': 'Définir le Budget Mensuel',
+    'form.budgetAmountLabel': 'Montant du Budget',
+    'form.enterBudgetPlaceholder': 'Entrez votre budget',
   }
 };
 

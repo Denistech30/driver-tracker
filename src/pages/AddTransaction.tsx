@@ -5,10 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Mic, Square } from 'lucide-react';
-import { addTransaction } from '../lib/storage';
+import { addTransaction, getTransactionById, updateTransaction } from '../lib/storage';
 import { getCategories, Category } from '../lib/categories';
 import { useSettings } from '../contexts/SettingsContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface FormData {
   type: 'revenue' | 'expense' | '';
@@ -19,6 +19,8 @@ interface FormData {
 }
 
 function AddTransaction() {
+  const { transactionId } = useParams<{ transactionId?: string }>();
+  const isEditMode = Boolean(transactionId);
   const { settings } = useSettings();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>({
@@ -54,6 +56,35 @@ function AddTransaction() {
       setVoiceError('Voice recognition is not supported in this browser.');
     }
   }, [settings.language]);
+
+  useEffect(() => {
+    if (isEditMode && transactionId) {
+      const existingTransaction = getTransactionById(transactionId);
+      if (existingTransaction) {
+        setFormData({
+          type: existingTransaction.type,
+          amount: existingTransaction.amount.toString(),
+          category: existingTransaction.category,
+          date: existingTransaction.date,
+          description: existingTransaction.description || '',
+        });
+      } else {
+        console.error('Transaction not found for editing:', transactionId);
+        navigate('/transactions'); 
+      }
+    }
+    // Reset form if not in edit mode (e.g., navigating from edit to add directly)
+    // Or if navigating away and back to add new.
+    if (!isEditMode) {
+      setFormData({
+        type: '',
+        amount: '',
+        category: '',
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+      });
+    }
+  }, [isEditMode, transactionId, navigate]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {};
@@ -104,13 +135,22 @@ function AddTransaction() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    addTransaction({
+    const transactionData = {
       type: formData.type as 'revenue' | 'expense',
       amount: Number(formData.amount),
       category: formData.category,
       date: formData.date,
       description: formData.description || undefined,
-    });
+    };
+
+    if (isEditMode && transactionId) {
+      updateTransaction({ ...transactionData, id: transactionId });
+    } else {
+      addTransaction(transactionData);
+    }
+
+
+
 
     navigate('/transactions');
   };
@@ -137,7 +177,7 @@ function AddTransaction() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-xl font-semibold text-gray-900">
-            Add Transaction
+            {isEditMode ? 'Edit Transaction' : 'Add Transaction'}
           </CardTitle>
         </CardHeader>
         <CardContent>

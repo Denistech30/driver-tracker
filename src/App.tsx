@@ -13,9 +13,22 @@ import Settings from './pages/Settings';
 import { Toaster } from './components/ui/toaster';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useSettings } from './contexts/SettingsContext';
+import { BudgetProvider } from './contexts/BudgetContext';
+import useInactivityNotification from './hooks/useInactivityNotification';
 
 // AppContent handles routing and app lock logic
 function AppContent() {
+  // Initialize inactivity notifications
+  useInactivityNotification();
+  
+  return (
+    <BudgetProvider>
+      <AppContentInner />
+    </BudgetProvider>
+  );
+}
+
+function AppContentInner() {
   const { isAppLocked, lockApp, auth, pinFeatureEnabled } = useAuth();
   const { settings } = useSettings(); 
 
@@ -141,6 +154,7 @@ function AppContent() {
             <Route index element={<Overview />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="add-transaction" element={<AddTransaction />} />
+            <Route path="transactions/edit/:transactionId" element={<AddTransaction />} />
             <Route path="reports" element={<Reports />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="categories" element={<Categories />} />

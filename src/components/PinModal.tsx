@@ -375,14 +375,19 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
           mode === 'setup' ? setupEmail : (auth.recoveryEmail || '')
         );
         
-        setMessage(mode === 'setup' ? 'PIN setup successful!' : 'PIN changed successfully!');
+        setMessage(isFromRecovery ? 'PIN reset successful! You can now use your new PIN to unlock the app.' : 
+                  (mode === 'setup' ? 'PIN setup successful!' : 'PIN changed successfully!'));
         onSuccess?.();
         
         // Reset form
         setPin('');
         setNewPin('');
         setConfirmNewPin('');
-        setIsFromRecovery(false); // Reset recovery flag after successful change
+        // Reset recovery state after successful change
+        if (isFromRecovery) {
+          setIsFromRecovery(false);
+          setMode('unlock'); // Switch back to unlock mode after successful reset
+        }
       } catch (error) {
         console.error('PIN setup error:', error);
         setError('An error occurred. Please try again.');
@@ -409,6 +414,52 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
         console.error('PIN disable error:', error);
         setError('An error occurred. Please try again.');
       }
+    }
+  };
+  
+  const handleChangePin = async () => {
+    try {
+      setError('');
+      
+      // Verify current PIN first (unless in recovery mode)
+      if (!isFromRecovery) {
+        const isCurrentPinValid = await verifyPin(pin);
+        if (!isCurrentPinValid) {
+          setError(t('pin.incorrectPin'));
+          setAttempts(prev => {
+            const newAttempts = prev + 1;
+            if (newAttempts >= MAX_ATTEMPTS) {
+              setLockedOut(true);
+              return 0;
+            }
+            return newAttempts;
+          });
+          return;
+        }
+      }
+      
+      // Check if new PIN and confirmation match
+      if (newPin !== confirmNewPin) {
+        setError(t('pin.noMatch'));
+        return;
+      }
+      
+      // Update the PIN
+      await setPinAndSecurityQuestion(newPin, setupQuestion, setupAnswer, setupEmail);
+      setMessage(isFromRecovery ? t('pin.resetSuccess') : t('pin.changed'));
+      
+      // Reset form and recovery state
+      setNewPin('');
+      setConfirmNewPin('');
+      setPin('');
+      setIsFromRecovery(false);
+      
+      // Call success callback
+      onSuccess?.();
+      
+    } catch (error) {
+      console.error('Error changing PIN:', error);
+      setError(isFromRecovery ? t('pin.resetError') : t('pin.changeError'));
     }
   };
   
@@ -622,7 +673,7 @@ const PinModal = ({ mode: initialMode, onClose, onSuccess, availableQuestions }:
               ) : (
                 /* PIN setup/change */
                 <div className="space-y-4">
-                  {mode === 'change' && (
+                  {mode === 'change' && !isFromRecovery && (
                     <div className="space-y-2">
                       <Label htmlFor="current-pin">Current PIN</Label>
                       <Input

@@ -1,6 +1,5 @@
-import type { Config } from 'tailwindcss'
-
-export default {
+/** @type {import('tailwindcss').Config} */
+module.exports = {
   content: ['./src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
@@ -51,6 +50,10 @@ export default {
       borderRadius: {
         DEFAULT: 'var(--radius)',
       },
+      borderColor: {
+        DEFAULT: 'hsl(var(--border))',
+        border: 'hsl(var(--border))',
+      },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
@@ -58,6 +61,8 @@ export default {
         "in-reverse": "in-reverse 0.2s ease-out",
         "out": "out 0.2s ease-in",
         "out-reverse": "out-reverse 0.2s ease-in",
+        "slide-in": "slide-in 0.2s ease-out",
+        "slide-out": "slide-out 0.2s ease-in",
       },
       keyframes: {
         "accordion-down": {
@@ -99,4 +104,4 @@ export default {
     'bg-background',
     'text-muted-foreground',
   ],
-} satisfies Config
+};

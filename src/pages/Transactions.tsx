@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { Transaction, getTransactions } from '../lib/storage';
 import { useSettings } from '../contexts/SettingsContext';
 import TransactionModal from '../components/TransactionModal';
 import SkeletonLoader from '../components/SkeletonLoader';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { Pencil } from 'lucide-react';
 
 function Transactions() {
+  const navigate = useNavigate();
   const { settings } = useSettings();
   const [filter, setFilter] = useState<'all' | 'revenue' | 'expense'>('all');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -123,6 +126,16 @@ function Transactions() {
                     >
                       {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
                     </Badge>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/transactions/edit/${transaction.id}`);
+                      }}
+                      className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
+                      aria-label="Edit transaction"
+                    >
+                      <Pencil className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </button>
                   </div>
                 </div>
               </div>
