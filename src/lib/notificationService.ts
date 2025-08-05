@@ -2,7 +2,7 @@
 const NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const LAST_ACTIVITY_KEY = 'lastActivityTime';
 
-// Request notification permission
+// Request notification permission with mobile PWA support
 export const requestNotificationPermission = async (): Promise<boolean> => {
   if (!('Notification' in window)) {
     console.warn('This browser does not support notifications.');
@@ -10,22 +10,55 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   }
 
   if (Notification.permission === 'granted') {
+    console.log('Notification permission already granted');
+    await setupBackgroundSync();
     return true;
   }
 
   const permission = await Notification.requestPermission();
+  console.log('Notification permission result:', permission);
   
   // If permission granted, ensure service worker is ready for background notifications
   if (permission === 'granted' && 'serviceWorker' in navigator) {
     try {
       const registration = await navigator.serviceWorker.ready;
       console.log('Service worker ready for background notifications');
+      await setupBackgroundSync();
     } catch (error) {
       console.log('Service worker not available for background notifications:', error);
     }
   }
   
   return permission === 'granted';
+};
+
+// Setup background sync for mobile PWA support
+const setupBackgroundSync = async (): Promise<void> => {
+  if ('serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Register for background sync if available
+      if ('sync' in registration) {
+        console.log('Registering background sync for inactivity check');
+        await (registration as any).sync.register('inactivity-check');
+      }
+      
+      // Register for periodic background sync if available (Chrome)
+      if ('periodicSync' in registration) {
+        console.log('Registering periodic background sync');
+        try {
+          await (registration as any).periodicSync.register('inactivity-check', {
+            minInterval: 24 * 60 * 60 * 1000 // 24 hours
+          });
+        } catch (error) {
+          console.log('Periodic background sync not available or permission denied:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error setting up background sync:', error);
+    }
+  }
 };
 
 // Function to open IndexedDB for better service worker compatibility
@@ -57,7 +90,7 @@ const saveToIndexedDB = async (key: string, value: number): Promise<void> => {
   }
 };
 
-// Update last activity time
+// Update last activity time with better mobile support
 export const updateLastActivityTime = (): void => {
   if (typeof window !== 'undefined') {
     const timestamp = Date.now();
@@ -75,6 +108,43 @@ export const updateLastActivityTime = (): void => {
         timestamp: timestamp
       });
     }
+    
+    console.log('Updated last activity time:', new Date(timestamp).toISOString());
+  }
+};
+
+// Test notification function for debugging
+export const testNotification = async (): Promise<boolean> => {
+  if (!('Notification' in window)) {
+    console.warn('This browser does not support notifications.');
+    return false;
+  }
+
+  if (Notification.permission !== 'granted') {
+    console.warn('Notification permission not granted');
+    return false;
+  }
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification('Test Notification', {
+        body: 'This is a test notification to verify the system is working.',
+        icon: '/icons/icon-192x192.png',
+        tag: 'test-notification'
+      });
+      console.log('Test notification sent successfully');
+      return true;
+    } else {
+      new Notification('Test Notification', {
+        body: 'This is a test notification to verify the system is working.',
+        icon: '/icons/icon-192x192.png'
+      });
+      return true;
+    }
+  } catch (error) {
+    console.error('Error sending test notification:', error);
+    return false;
   }
 };
 

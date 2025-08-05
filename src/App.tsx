@@ -10,6 +10,7 @@ import Reports from './pages/Reports';
 import Calendar from './pages/Calendar';
 import Categories from './pages/Categories';
 import Settings from './pages/Settings';
+import NotificationTest from './pages/NotificationTest';
 import { Toaster } from './components/ui/toaster';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useSettings } from './contexts/SettingsContext';
@@ -159,6 +160,7 @@ function AppContentInner() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="categories" element={<Categories />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="notification-test" element={<NotificationTest />} />
           </Route>
         </Routes>
       )}

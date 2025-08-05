@@ -74,6 +74,7 @@ registerRoute(
 
 // Install event - precache important URLs
 self.addEventListener('install', (event) => {
+  console.log('Service worker installing');
   // Precache the offline page
   event.waitUntil(
     caches.open('offline-fallback').then((cache) => {
@@ -83,11 +84,48 @@ self.addEventListener('install', (event) => {
       ]);
     }).then(() => {
       // Initialize last activity time on install
+      console.log('Initializing last activity time');
       return saveLastActivityTime(Date.now());
     })
   );
   
   self.skipWaiting();
+});
+
+// Add background sync event for better mobile support
+self.addEventListener('sync', (event) => {
+  console.log('Background sync event:', event.tag);
+  if (event.tag === 'inactivity-check') {
+    event.waitUntil(
+      (async () => {
+        try {
+          if (await shouldSendNotification()) {
+            await sendInactivityNotification();
+          }
+        } catch (error) {
+          console.error('Error in background sync:', error);
+        }
+      })()
+    );
+  }
+});
+
+// Add periodic background sync if available (for better mobile support)
+self.addEventListener('periodicsync', (event) => {
+  console.log('Periodic background sync event:', event.tag);
+  if (event.tag === 'inactivity-check') {
+    event.waitUntil(
+      (async () => {
+        try {
+          if (await shouldSendNotification()) {
+            await sendInactivityNotification();
+          }
+        } catch (error) {
+          console.error('Error in periodic background sync:', error);
+        }
+      })()
+    );
+  }
 });
 
 // Activate event - clean up old caches
@@ -110,8 +148,15 @@ self.addEventListener('activate', (event) => {
       );
     }).then(() => {
       self.clients.claim();
+      console.log('Service worker activated');
       // Start the inactivity check timer
       startInactivityTimer();
+      // Try to register for background sync if available
+      if (self.registration.sync) {
+        console.log('Background sync available');
+      } else {
+        console.log('Background sync not available');
+      }
     })
   );
 });
@@ -177,40 +222,83 @@ const shouldSendNotification = async () => {
   return timeSinceLastActivity >= NOTIFICATION_INTERVAL_MS;
 };
 
-// Function to send notification
-const sendInactivityNotification = () => {
-  self.registration.showNotification('Track Your Expenses', {
-    body: "It's been 24 hours! Don't forget to track your daily transactions.",
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    tag: 'inactivity-reminder',
-    requireInteraction: true,
-    actions: [
-      {
-        action: 'open-app',
-        title: 'Open App'
-      },
-      {
-        action: 'dismiss',
-        title: 'Dismiss'
+// Function to send notification with better mobile support
+const sendInactivityNotification = async () => {
+  try {
+    // Check if we have permission
+    if (!self.registration || !self.registration.showNotification) {
+      console.error('Service worker registration or showNotification not available');
+      return false;
+    }
+    
+    // Show notification with mobile-optimized settings
+    await self.registration.showNotification('Track Your Expenses', {
+      body: "It's been 24 hours! Don't forget to track your daily transactions.",
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-72x72.png',
+      tag: 'inactivity-reminder',
+      requireInteraction: false, // Changed to false for better mobile compatibility
+      silent: false,
+      vibrate: [200, 100, 200], // Add vibration for mobile
+      timestamp: Date.now(),
+      actions: [
+        {
+          action: 'open-app',
+          title: 'Open App',
+          icon: '/icons/icon-72x72.png'
+        },
+        {
+          action: 'dismiss',
+          title: 'Later'
+        }
+      ],
+      data: {
+        type: 'inactivity-reminder',
+        timestamp: Date.now()
       }
-    ]
-  });
+    });
+    
+    console.log('Notification sent successfully');
+    return true;
+  } catch (error) {
+    console.error('Error sending notification:', error);
+    return false;
+  }
 };
 
-// Function to start the inactivity timer
+// Function to start the inactivity timer with mobile-friendly approach
 const startInactivityTimer = () => {
   // Clear any existing timer
   if (self.notificationTimer) {
     clearInterval(self.notificationTimer);
   }
   
-  // Check every hour for inactivity
+  // Use a more frequent check (every 30 minutes) for better mobile compatibility
+  // Mobile browsers may throttle or kill longer intervals
   self.notificationTimer = setInterval(async () => {
-    if (await shouldSendNotification()) {
-      sendInactivityNotification();
+    try {
+      console.log('Checking for inactivity notification...');
+      if (await shouldSendNotification()) {
+        console.log('Sending inactivity notification');
+        await sendInactivityNotification();
+      } else {
+        console.log('No notification needed yet');
+      }
+    } catch (error) {
+      console.error('Error in inactivity check:', error);
     }
-  }, 60 * 60 * 1000); // Check every hour
+  }, 30 * 60 * 1000); // Check every 30 minutes for better mobile compatibility
+  
+  // Also do an immediate check
+  setTimeout(async () => {
+    try {
+      if (await shouldSendNotification()) {
+        await sendInactivityNotification();
+      }
+    } catch (error) {
+      console.error('Error in immediate inactivity check:', error);
+    }
+  }, 5000); // Check after 5 seconds
 };
 
 // Listen for messages from the main app
