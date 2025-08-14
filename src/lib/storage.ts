@@ -1,3 +1,5 @@
+import { updateLastTransactionTime } from './notificationService';
+
 export interface Transaction {
   id: string;
   type: 'revenue' | 'expense';
@@ -28,6 +30,9 @@ export function addTransaction(transaction: Omit<Transaction, 'id'>): void {
     };
     transactions.push(newTransaction);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    // Record the time of the last created transaction for notification scheduling
+    const txTime = new Date(newTransaction.date).getTime();
+    updateLastTransactionTime(Number.isFinite(txTime) ? txTime : undefined);
   } catch (error) {
     console.error('Failed to add transaction:', error);
   }
@@ -50,6 +55,9 @@ export function updateTransaction(updatedTransaction: Transaction): void {
       t.id === updatedTransaction.id ? updatedTransaction : t
     );
     localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    // Updating a transaction counts as recent activity related to transactions
+    const txTime = new Date(updatedTransaction.date).getTime();
+    updateLastTransactionTime(Number.isFinite(txTime) ? txTime : undefined);
   } catch (error) {
     console.error('Failed to update transaction:', error);
   }

@@ -1,6 +1,7 @@
 // Notification service for handling inactivity notifications
 const NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const LAST_ACTIVITY_KEY = 'lastActivityTime';
+const LAST_TRANSACTION_KEY = 'lastTransactionTime';
 
 // Request notification permission with mobile PWA support
 export const requestNotificationPermission = async (): Promise<boolean> => {
@@ -30,6 +31,29 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   }
   
   return permission === 'granted';
+};
+
+// Update last transaction time (used to trigger 24h reminders based on last transaction)
+export const updateLastTransactionTime = (timestampOverride?: number): void => {
+  if (typeof window !== 'undefined') {
+    const timestamp = timestampOverride ?? Date.now();
+
+    // Save to localStorage for immediate access
+    localStorage.setItem(LAST_TRANSACTION_KEY, timestamp.toString());
+
+    // Save to IndexedDB for service worker access
+    saveToIndexedDB(LAST_TRANSACTION_KEY, timestamp);
+
+    // Also update in service worker if possible
+    if (navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'UPDATE_LAST_TRANSACTION',
+        timestamp
+      });
+    }
+
+    console.log('Updated last transaction time:', new Date(timestamp).toISOString());
+  }
 };
 
 // Setup background sync for mobile PWA support
@@ -155,10 +179,18 @@ export const getLastActivityTime = (): number => {
   return lastTime ? parseInt(lastTime, 10) : Date.now();
 };
 
+// Get last transaction time
+export const getLastTransactionTime = (): number => {
+  if (typeof window === 'undefined') return Date.now();
+  const lastTime = localStorage.getItem(LAST_TRANSACTION_KEY);
+  return lastTime ? parseInt(lastTime, 10) : Date.now();
+};
+
 // Check if notification should be shown
 export const shouldShowNotification = (): boolean => {
-  const lastActivityTime = getLastActivityTime();
-  return Date.now() - lastActivityTime >= NOTIFICATION_INTERVAL_MS;
+  // Strictly based on last transaction time
+  const lastTransactionTime = getLastTransactionTime();
+  return Date.now() - lastTransactionTime >= NOTIFICATION_INTERVAL_MS;
 };
 
 // Show notification

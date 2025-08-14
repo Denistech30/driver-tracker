@@ -46,18 +46,22 @@ self.addEventListener('fetch', (event) => {
 // Handle messages from the main thread
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'UPDATE_LAST_ACTIVITY') {
-    // Update last activity time in IndexedDB
     const timestamp = event.data.timestamp || Date.now();
     updateLastActivityTimeInSW(timestamp);
+  } else if (event.data && event.data.type === 'UPDATE_LAST_TRANSACTION') {
+    const timestamp = event.data.timestamp || Date.now();
+    updateLastTransactionTimeInSW(timestamp);
   }
 });
 
 // Check for inactivity and show notification if needed
 const checkInactivityAndNotify = async () => {
   const lastActivityTime = await getLastActivityTimeFromSW();
+  const lastTransactionTime = await getLastTransactionTimeFromSW();
+  const baseline = Math.min(lastActivityTime, lastTransactionTime);
   const now = Date.now();
-  
-  if (now - lastActivityTime >= 24 * 60 * 60 * 1000) { // 24 hours
+
+  if (now - baseline >= 24 * 60 * 60 * 1000) { // 24 hours
     self.registration.showNotification(NOTIFICATION_TITLE, NOTIFICATION_OPTIONS);
   }
 };
@@ -77,6 +81,21 @@ const getLastActivityTimeFromSW = async () => {
   return Date.now();
 };
 
+// Get last transaction time from Cache Storage or fallback to now
+const getLastTransactionTimeFromSW = async () => {
+  try {
+    const cache = await caches.open('activity-cache');
+    const response = await cache.match('last-transaction');
+    if (response) {
+      const data = await response.json();
+      return data.timestamp;
+    }
+  } catch (error) {
+    console.error('Error reading last transaction from cache:', error);
+  }
+  return Date.now();
+};
+
 // Update last activity time in IndexedDB
 const updateLastActivityTimeInSW = async (timestamp) => {
   try {
@@ -89,6 +108,21 @@ const updateLastActivityTimeInSW = async (timestamp) => {
     );
   } catch (error) {
     console.error('Error updating activity time:', error);
+  }
+};
+
+// Update last transaction time in Cache Storage
+const updateLastTransactionTimeInSW = async (timestamp) => {
+  try {
+    const cache = await caches.open('activity-cache');
+    await cache.put(
+      'last-transaction',
+      new Response(JSON.stringify({ timestamp }), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+  } catch (error) {
+    console.error('Error updating last transaction time:', error);
   }
 };
 

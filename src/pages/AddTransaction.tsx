@@ -186,6 +186,25 @@ function AddTransaction() {
               <label htmlFor="type" className="text-sm font-medium text-muted-foreground">
                 Type
               </label>
+              {/* Quick type chips (keeps Select below for accessibility) */}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={formData.type === 'revenue' ? 'default' : 'outline'}
+                  onClick={() => setFormData((prev) => ({ ...prev, type: 'revenue', category: '' }))}
+                  aria-pressed={formData.type === 'revenue'}
+                >
+                  Revenue
+                </Button>
+                <Button
+                  type="button"
+                  variant={formData.type === 'expense' ? 'default' : 'outline'}
+                  onClick={() => setFormData((prev) => ({ ...prev, type: 'expense', category: '' }))}
+                  aria-pressed={formData.type === 'expense'}
+                >
+                  Expense
+                </Button>
+              </div>
               <Select
                 value={formData.type}
                 onValueChange={(value) =>
@@ -280,6 +299,32 @@ function AddTransaction() {
                 onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
                 max={new Date().toISOString().split('T')[0]}
               />
+              {/* Date shortcuts */}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, date: new Date().toISOString().split('T')[0] }))
+                  }
+                >
+                  Today
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 1);
+                    const y = d.toISOString().split('T')[0];
+                    setFormData((prev) => ({ ...prev, date: y }));
+                  }}
+                >
+                  Yesterday
+                </Button>
+              </div>
               {errors.date && <p className="text-sm text-destructive">{errors.date}</p>}
             </div>
             <div className="space-y-2">

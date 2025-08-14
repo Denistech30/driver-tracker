@@ -78,8 +78,21 @@ export class PDFService {
 /**
  * Helper function to format currency
  */
-export const formatCurrency = (amount: number, currencySymbol: string): string => {
-  return `${currencySymbol} ${amount.toLocaleString('en-US')}`;
+export const formatCurrency = (amount: number, currencyCodeOrLabel: string): string => {
+  // Normalize FCFA to XAF for Intl, then replace back to FCFA label
+  const code = currencyCodeOrLabel === 'FCFA' ? 'XAF' : currencyCodeOrLabel;
+  try {
+    const formatted = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code as any,
+      currencyDisplay: 'code',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+    return currencyCodeOrLabel === 'FCFA' ? formatted.replace('XAF', 'FCFA') : formatted;
+  } catch {
+    return `${currencyCodeOrLabel} ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
 };
 
 /**
@@ -107,12 +120,21 @@ export const generateFinancialReportPDF = async (
       net: number;
       status: string;
     }>;
+    transactions?: Array<{
+      date: string;
+      type: 'revenue' | 'expense';
+      category: string;
+      amount: number;
+      description?: string;
+    }>;
   },
   fileName: string,
-  currencySymbol: string
+  currencySymbol: string,
+  options?: { landscape?: boolean; includeCategoryPercent?: boolean; includeTransactionsAppendix?: boolean }
 ): Promise<void> => {
-  // Create a new PDF service instance
-  const pdfService = new PDFService();
+  // Create a new PDF service instance (landscape for daily report if requested)
+  const wantLandscape = Boolean(options?.landscape) && reportType === 'daily';
+  const pdfService = new PDFService(wantLandscape ? 'l' : 'p');
   let yPos = 15; // Starting Y position
 
   // Format currency helper
@@ -180,24 +202,67 @@ export const generateFinancialReportPDF = async (
     
     yPos += 7;
     
-    // Category table
+    // Category table (optionally include % of total within type, and sort by amount desc)
+    const catsSorted = [...data.categoryBreakdown].sort((a, b) => b.amount - a.amount);
+    const totalByType: Record<string, number> = catsSorted.reduce((acc, c) => {
+      acc[c.type] = (acc[c.type] || 0) + c.amount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const includePct = Boolean(options?.includeCategoryPercent);
+    const head = includePct
+      ? [['Category Type', 'Type', 'Amount', '% of Type', 'Description']]
+      : [['Category Type', 'Type', 'Amount', 'Description']];
+
+    const body = catsSorted.map(item => {
+      const pct = totalByType[item.type] ? ((item.amount / totalByType[item.type]) * 100) : 0;
+      return includePct
+        ? [item.categoryType, item.type, formatCurr(item.amount), `${pct.toFixed(1)}%`, item.description]
+        : [item.categoryType, item.type, formatCurr(item.amount), item.description];
+    });
+
     pdfService.addTable({
       startY: yPos,
-      head: [['Category Type', 'Type', 'Amount', 'Description']],
-      body: data.categoryBreakdown.map(item => [
-        item.categoryType,
-        item.type,
-        formatCurr(item.amount),
-        item.description,
-      ]),
+      head,
+      body,
       theme: 'grid',
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', fontSize: 11 },
       styles: { fontSize: 10, cellPadding: 3, valign: 'middle' },
-      columnStyles: {
-        2: { halign: 'right' },
-      },
+      columnStyles: includePct
+        ? { 2: { halign: 'right' }, 3: { halign: 'right' } }
+        : { 2: { halign: 'right' } },
       margin: { left: 10, right: 10 },
     });
+
+    // Transactions Appendix (optional)
+    if (options?.includeTransactionsAppendix && data.transactions && data.transactions.length > 0) {
+      // Advance below previous table
+      yPos = (pdfService as any).doc?.lastAutoTable?.finalY ? (pdfService as any).doc.lastAutoTable.finalY + 12 : yPos + 60;
+
+      pdfService.setFontSize(16).addText('Transactions (Appendix)', 14, yPos);
+      yPos += 7;
+
+      pdfService.addTable({
+        startY: yPos,
+        head: [['Date', 'Type', 'Category', 'Amount', 'Description']],
+        body: data.transactions
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .map(tx => [
+            new Date(tx.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+            tx.type.charAt(0).toUpperCase() + tx.type.slice(1),
+            tx.category,
+            formatCurr(tx.amount),
+            tx.description || '-',
+          ]),
+        theme: 'striped',
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', fontSize: 11 },
+        styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+        columnStyles: {
+          3: { halign: 'right' },
+        },
+        margin: { left: 10, right: 10 },
+      });
+    }
     
   } else if (reportType === 'daily') {
     // Daily Performance section
@@ -258,15 +323,21 @@ export const generateFinancialReportPDF = async (
     });
   }
 
-  // --- Footer ---
-  pdfService.setFontSize(10)
-    .setTextColor(150, 150, 150)
-    .addText(
-      'Driver Tracker App - Financial Report',
-      pdfService.getPageWidth() / 2,
-      pdfService.getPageHeight() - 10,
-      { align: 'center' }
-    );
+  // --- Footer with page numbers ---
+  const docAny: any = (pdfService as any);
+  const doc = (docAny.doc || (docAny.getDoc && docAny.getDoc())) || (docAny as any);
+  const totalPages = (doc as jsPDF).getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    (doc as jsPDF).setPage(i);
+    pdfService.setFontSize(10)
+      .setTextColor(150, 150, 150)
+      .addText(
+        `Driver Tracker App - Financial Report | Page ${i} of ${totalPages}`,
+        pdfService.getPageWidth() / 2,
+        pdfService.getPageHeight() - 10,
+        { align: 'center' }
+      );
+  }
 
   // Save the PDF
   pdfService.save(fileName);

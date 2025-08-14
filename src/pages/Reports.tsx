@@ -52,6 +52,9 @@ function Reports() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [showPdfOptions, setShowPdfOptions] = useState(false);
+  const [optLandscapeDaily, setOptLandscapeDaily] = useState(false);
+  const [optCategoryPercent, setOptCategoryPercent] = useState(false);
+  const [optIncludeAppendix, setOptIncludeAppendix] = useState(false);
   const { toast } = useToast();
   const [reportData, setReportData] = useState<ReportData>({
     revenue: 0,
@@ -174,9 +177,15 @@ function Reports() {
             description: cat.description || 'N/A'
           })),
           dailyPerformance: dailyPerformanceData,
+          transactions: reportData.transactions,
         },
         fileName,
-        settings.currency
+        settings.currency,
+        {
+          landscape: reportType === 'daily' ? optLandscapeDaily : false,
+          includeCategoryPercent: reportType === 'summary' ? optCategoryPercent : false,
+          includeTransactionsAppendix: reportType === 'summary' ? optIncludeAppendix : false,
+        }
       );
 
       toast({
@@ -264,8 +273,37 @@ function Reports() {
           </Button>
 
           {showPdfOptions && !isExporting && (
-            <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-10"
-                 style={{ minWidth: '220px' }}>
+            <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2"
+                 style={{ minWidth: '260px' }}>
+              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">Options</div>
+              <div className="px-3 py-2 flex items-center gap-2">
+                <input
+                  id="optCategoryPercent"
+                  type="checkbox"
+                  checked={optCategoryPercent}
+                  onChange={(e) => setOptCategoryPercent(e.target.checked)}
+                />
+                <label htmlFor="optCategoryPercent" className="text-sm">Include % of Type (Summary)</label>
+              </div>
+              <div className="px-3 py-2 flex items-center gap-2">
+                <input
+                  id="optIncludeAppendix"
+                  type="checkbox"
+                  checked={optIncludeAppendix}
+                  onChange={(e) => setOptIncludeAppendix(e.target.checked)}
+                />
+                <label htmlFor="optIncludeAppendix" className="text-sm">Include Transactions Appendix (Summary)</label>
+              </div>
+              <div className="px-3 py-2 flex items-center gap-2">
+                <input
+                  id="optLandscapeDaily"
+                  type="checkbox"
+                  checked={optLandscapeDaily}
+                  onChange={(e) => setOptLandscapeDaily(e.target.checked)}
+                />
+                <label htmlFor="optLandscapeDaily" className="text-sm">Landscape (Daily)</label>
+              </div>
+              <div className="border-t my-2" />
               <button
                 onClick={() => handleGeneratePdfOption('summary')}
                 className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100"

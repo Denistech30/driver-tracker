@@ -164,9 +164,10 @@ self.addEventListener('activate', (event) => {
 // Background notification functionality
 const NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const LAST_ACTIVITY_KEY = 'lastActivityTime';
+const LAST_TRANSACTION_KEY = 'lastTransactionTime';
 const NOTIFICATION_TIMER_KEY = 'notificationTimer';
 
-// Function to get last activity time from IndexedDB or localStorage
+// Function to get last activity time from IndexedDB or fallback
 const getLastActivityTime = async () => {
   try {
     // Try to get from IndexedDB first (more reliable for service workers)
@@ -184,6 +185,24 @@ const getLastActivityTime = async () => {
   
   // Fallback: simulate localStorage access (service workers can't directly access localStorage)
   return Date.now(); // Default to current time if no data found
+};
+
+// Function to get last transaction time from IndexedDB or fallback
+const getLastTransactionTime = async () => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(['settings'], 'readonly');
+    const store = transaction.objectStore('settings');
+    const result = await store.get(LAST_TRANSACTION_KEY);
+
+    if (result && result.value) {
+      return result.value;
+    }
+  } catch (error) {
+    console.log('IndexedDB not available for last transaction time, using now()');
+  }
+
+  return Date.now();
 };
 
 // Function to open IndexedDB
@@ -215,11 +234,26 @@ const saveLastActivityTime = async (timestamp) => {
   }
 };
 
+// Function to save last transaction time to IndexedDB
+const saveLastTransactionTime = async (timestamp) => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(['settings'], 'readwrite');
+    const store = transaction.objectStore('settings');
+    await store.put({ key: LAST_TRANSACTION_KEY, value: timestamp });
+  } catch (error) {
+    console.log('Could not save last transaction to IndexedDB:', error);
+  }
+};
+
 // Function to check if notification should be sent
 const shouldSendNotification = async () => {
   const lastActivityTime = await getLastActivityTime();
-  const timeSinceLastActivity = Date.now() - lastActivityTime;
-  return timeSinceLastActivity >= NOTIFICATION_INTERVAL_MS;
+  const lastTransactionTime = await getLastTransactionTime();
+  // Use the earlier timestamp as baseline (i.e., whichever is more recent to reset inactivity)
+  const baseline = Math.min(lastActivityTime, lastTransactionTime);
+  const elapsed = Date.now() - baseline;
+  return elapsed >= NOTIFICATION_INTERVAL_MS;
 };
 
 // Function to send notification with better mobile support
@@ -305,6 +339,8 @@ const startInactivityTimer = () => {
 self.addEventListener('message', async (event) => {
   if (event.data && event.data.type === 'UPDATE_LAST_ACTIVITY') {
     await saveLastActivityTime(event.data.timestamp);
+  } else if (event.data && event.data.type === 'UPDATE_LAST_TRANSACTION') {
+    await saveLastTransactionTime(event.data.timestamp);
   }
 });
 
