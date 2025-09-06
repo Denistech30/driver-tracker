@@ -81,6 +81,9 @@ self.addEventListener('install', (event) => {
         '/', // Homepage
         '/offline.html' // Dedicated offline page (you'll need to create this)
       ]);
+    }).then(() => {
+      // Initialize last activity time on install
+      return saveLastActivityTime(Date.now());
     })
   );
   
@@ -107,8 +110,136 @@ self.addEventListener('activate', (event) => {
       );
     }).then(() => {
       self.clients.claim();
+      // Start the inactivity check timer
+      startInactivityTimer();
     })
   );
+});
+
+// Background notification functionality
+const NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const LAST_ACTIVITY_KEY = 'lastActivityTime';
+const NOTIFICATION_TIMER_KEY = 'notificationTimer';
+
+// Function to get last activity time from IndexedDB or localStorage
+const getLastActivityTime = async () => {
+  try {
+    // Try to get from IndexedDB first (more reliable for service workers)
+    const db = await openDB();
+    const transaction = db.transaction(['settings'], 'readonly');
+    const store = transaction.objectStore('settings');
+    const result = await store.get(LAST_ACTIVITY_KEY);
+    
+    if (result && result.value) {
+      return result.value;
+    }
+  } catch (error) {
+    console.log('IndexedDB not available, falling back to localStorage simulation');
+  }
+  
+  // Fallback: simulate localStorage access (service workers can't directly access localStorage)
+  return Date.now(); // Default to current time if no data found
+};
+
+// Function to open IndexedDB
+const openDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('XpenseDB', 1);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('settings')) {
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+  });
+};
+
+// Function to save last activity time to IndexedDB
+const saveLastActivityTime = async (timestamp) => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(['settings'], 'readwrite');
+    const store = transaction.objectStore('settings');
+    await store.put({ key: LAST_ACTIVITY_KEY, value: timestamp });
+  } catch (error) {
+    console.log('Could not save to IndexedDB:', error);
+  }
+};
+
+// Function to check if notification should be sent
+const shouldSendNotification = async () => {
+  const lastActivityTime = await getLastActivityTime();
+  const timeSinceLastActivity = Date.now() - lastActivityTime;
+  return timeSinceLastActivity >= NOTIFICATION_INTERVAL_MS;
+};
+
+// Function to send notification
+const sendInactivityNotification = () => {
+  self.registration.showNotification('Track Your Expenses', {
+    body: "It's been 24 hours! Don't forget to track your daily transactions.",
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-72x72.png',
+    tag: 'inactivity-reminder',
+    requireInteraction: true,
+    actions: [
+      {
+        action: 'open-app',
+        title: 'Open App'
+      },
+      {
+        action: 'dismiss',
+        title: 'Dismiss'
+      }
+    ]
+  });
+};
+
+// Function to start the inactivity timer
+const startInactivityTimer = () => {
+  // Clear any existing timer
+  if (self.notificationTimer) {
+    clearInterval(self.notificationTimer);
+  }
+  
+  // Check every hour for inactivity
+  self.notificationTimer = setInterval(async () => {
+    if (await shouldSendNotification()) {
+      sendInactivityNotification();
+    }
+  }, 60 * 60 * 1000); // Check every hour
+};
+
+// Listen for messages from the main app
+self.addEventListener('message', async (event) => {
+  if (event.data && event.data.type === 'UPDATE_LAST_ACTIVITY') {
+    await saveLastActivityTime(event.data.timestamp);
+  }
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  
+  if (event.action === 'open-app') {
+    // Open the app
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window' }).then((clients) => {
+        // Check if app is already open
+        for (const client of clients) {
+          if (client.url.includes(self.location.origin)) {
+            return client.focus();
+          }
+        }
+        // Open new window if app is not open
+        return self.clients.openWindow('/');
+      })
+    );
+  }
+  // For 'dismiss' action, just close the notification (already done above)
 });
 
 // Offline fallback with secure HTML template using DOMPurify concepts

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Pie, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
-import { getSummary, getExpenseCategories } from '../lib/storage';
+import { getCurrentMonthSummary, getCurrentMonthExpenseCategories } from '../lib/storage';
 import { useSettings } from '../contexts/SettingsContext';
 import SkeletonLoader from '../components/SkeletonLoader';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -46,8 +46,8 @@ export default function Overview() {
 
   useEffect(() => {
     const loadData = () => {
-      const summary = getSummary();
-      const categories = getExpenseCategories();
+      const summary = getCurrentMonthSummary();
+      const categories = getCurrentMonthExpenseCategories();
       
       const colors = [
         'hsl(215, 90%, 50%)', 'hsl(150, 80%, 40%)', 'hsl(350, 85%, 50%)',

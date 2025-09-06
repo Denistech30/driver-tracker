@@ -55,6 +55,37 @@ export function updateTransaction(updatedTransaction: Transaction): void {
   }
 }
 
+// Helper function to check if a transaction is from a specific month
+function isFromMonth(transaction: Transaction, year: number, month: number): boolean {
+  const transactionDate = new Date(transaction.date);
+  return transactionDate.getFullYear() === year && transactionDate.getMonth() === month;
+}
+
+// Helper function to get current month transactions
+function getCurrentMonthTransactions(): Transaction[] {
+  const transactions = getTransactions();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  
+  return transactions.filter(t => isFromMonth(t, currentYear, currentMonth));
+}
+
+// Get summary for current month only
+export function getCurrentMonthSummary() {
+  const transactions = getCurrentMonthTransactions();
+  const revenue = transactions
+    .filter((t) => t.type === 'revenue')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const expenses = transactions
+    .filter((t) => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const netIncome = revenue - expenses;
+
+  return { revenue, expenses, netIncome };
+}
+
+// Original function - kept for backward compatibility (used by Calendar and other pages)
 export function getSummary() {
   const transactions = getTransactions();
   const revenue = transactions
@@ -68,6 +99,31 @@ export function getSummary() {
   return { revenue, expenses, netIncome };
 }
 
+// Get expense categories for current month only
+export function getCurrentMonthExpenseCategories() {
+  const transactions = getCurrentMonthTransactions();
+  
+  // Filter only expense transactions
+  const expenseTransactions = transactions.filter((t) => t.type === 'expense');
+  
+  // If no expense transactions, return empty array
+  if (expenseTransactions.length === 0) {
+    return [];
+  }
+  
+  // Aggregate expenses by category
+  const categories = expenseTransactions.reduce((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + t.amount;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Convert to array and sort by amount descending
+  return Object.entries(categories)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+// Original function - kept for backward compatibility (used by Calendar and other pages)
 export function getExpenseCategories() {
   const transactions = getTransactions();
   

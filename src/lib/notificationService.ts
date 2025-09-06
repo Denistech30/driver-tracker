@@ -14,18 +14,65 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   }
 
   const permission = await Notification.requestPermission();
+  
+  // If permission granted, ensure service worker is ready for background notifications
+  if (permission === 'granted' && 'serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      console.log('Service worker ready for background notifications');
+    } catch (error) {
+      console.log('Service worker not available for background notifications:', error);
+    }
+  }
+  
   return permission === 'granted';
+};
+
+// Function to open IndexedDB for better service worker compatibility
+const openDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('XpenseDB', 1);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains('settings')) {
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+  });
+};
+
+// Function to save to IndexedDB
+const saveToIndexedDB = async (key: string, value: number): Promise<void> => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(['settings'], 'readwrite');
+    const store = transaction.objectStore('settings');
+    await store.put({ key, value });
+  } catch (error) {
+    console.log('Could not save to IndexedDB:', error);
+  }
 };
 
 // Update last activity time
 export const updateLastActivityTime = (): void => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+    const timestamp = Date.now();
+    
+    // Save to localStorage for immediate access
+    localStorage.setItem(LAST_ACTIVITY_KEY, timestamp.toString());
+    
+    // Save to IndexedDB for service worker access
+    saveToIndexedDB(LAST_ACTIVITY_KEY, timestamp);
+    
     // Also update in service worker if possible
     if (navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage({
         type: 'UPDATE_LAST_ACTIVITY',
-        timestamp: Date.now()
+        timestamp: timestamp
       });
     }
   }
