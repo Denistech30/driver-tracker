@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { Home, List, Plus, FileText, Calendar as CalendarIcon, Tag, Settings as SettingsIcon } from 'lucide-react';
+import InstallPrompt from './InstallPrompt';
 
 interface NavItem {
   name: string;
@@ -53,6 +54,8 @@ function Layout() {
             </NavLink>
           </div>
         </div>
+        {/* Install prompt banner mounts here so it sits beneath the header and above content */}
+        <InstallPrompt />
       </header>
 
       {/* Main Content */}

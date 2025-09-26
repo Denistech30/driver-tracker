@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'sw.js'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'Xpense',
         short_name: 'Xpense',
@@ -66,7 +66,7 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/api\.*/i,
+            urlPattern: /^https:\/\/api\..*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',

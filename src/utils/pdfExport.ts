@@ -1,3 +1,8 @@
+/**
+ * DEPRECATED: This file is a legacy PDF helper kept for reference.
+ * The app uses `utils/pdfService.ts` (generateFinancialReportPDF) for report exports.
+ * Prefer updating `pdfService.ts` instead of this module.
+ */
 // Import jsPDF dynamically to ensure proper initialization with autoTable plugin
 import { jsPDF } from 'jspdf';
 
@@ -212,7 +217,7 @@ export async function generateFinancialReportPDF(
   // Position footer at the bottom of the page
   doc.setFontSize(10);
   doc.setTextColor(150, 150, 150);
-  const footerText = 'Driver Tracker App - Financial Report';
+  const footerText = 'Xpense Tracker App - Financial Report';
   const pageHeight = doc.internal.pageSize.getHeight();
   doc.text(
     footerText,

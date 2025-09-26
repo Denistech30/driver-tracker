@@ -9,6 +9,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import SkeletonLoader from '../components/SkeletonLoader';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { generateFinancialReportPDF } from '../utils/pdfService';
+import { generateCategoryPieChartImage, generateDailyNetLineChartImage, generateRevenueExpensesBarImage } from '../utils/chartImage';
 import { useToast } from "../hooks/use-toast";
 
 // Define interfaces for data structures needed
@@ -55,6 +56,8 @@ function Reports() {
   const [optLandscapeDaily, setOptLandscapeDaily] = useState(false);
   const [optCategoryPercent, setOptCategoryPercent] = useState(false);
   const [optIncludeAppendix, setOptIncludeAppendix] = useState(false);
+  const [optIncludeCharts, setOptIncludeCharts] = useState(false);
+  const [optModernTemplate, setOptModernTemplate] = useState(false);
   const { toast } = useToast();
   const [reportData, setReportData] = useState<ReportData>({
     revenue: 0,
@@ -161,6 +164,36 @@ function Reports() {
     setShowPdfOptions(false);
 
     try {
+      // Optionally generate charts as images to embed in the PDF
+      let charts: Array<{ title: string; dataUrl: string; width?: number; height?: number }> | undefined = undefined;
+      if (optIncludeCharts) {
+        charts = [];
+        const locale = settings.language || 'en-US';
+        // Revenue vs Expenses bar chart
+        const revExpImg = await generateRevenueExpensesBarImage(
+          reportData.revenue,
+          reportData.expenses,
+          settings.currency,
+          locale
+        );
+        if (revExpImg) charts.push(revExpImg);
+        // Category Pie (Summary mode best, but useful in general)
+        const catImg = await generateCategoryPieChartImage(
+          reportData.categories.map(c => ({ name: c.name, amount: c.amount, type: c.type })),
+          settings.currency,
+          locale
+        );
+        if (catImg) charts.push(catImg);
+        // Daily Line chart
+        const dailyImg = await generateDailyNetLineChartImage(
+          dailyPerformanceData,
+          settings.currency,
+          locale
+        );
+        if (dailyImg) charts.push(dailyImg);
+        if (charts.length === 0) charts = undefined;
+      }
+
       await generateFinancialReportPDF(
         reportType,
         {
@@ -185,6 +218,9 @@ function Reports() {
           landscape: reportType === 'daily' ? optLandscapeDaily : false,
           includeCategoryPercent: reportType === 'summary' ? optCategoryPercent : false,
           includeTransactionsAppendix: reportType === 'summary' ? optIncludeAppendix : false,
+          locale: settings.language || 'en-US',
+          charts,
+          template: optModernTemplate ? 'modern' : 'classic',
         }
       );
 
@@ -302,6 +338,24 @@ function Reports() {
                   onChange={(e) => setOptLandscapeDaily(e.target.checked)}
                 />
                 <label htmlFor="optLandscapeDaily" className="text-sm">Landscape (Daily)</label>
+              </div>
+              <div className="px-3 py-2 flex items-center gap-2">
+                <input
+                  id="optIncludeCharts"
+                  type="checkbox"
+                  checked={optIncludeCharts}
+                  onChange={(e) => setOptIncludeCharts(e.target.checked)}
+                />
+                <label htmlFor="optIncludeCharts" className="text-sm">Include Charts</label>
+              </div>
+              <div className="px-3 py-2 flex items-center gap-2">
+                <input
+                  id="optModernTemplate"
+                  type="checkbox"
+                  checked={optModernTemplate}
+                  onChange={(e) => setOptModernTemplate(e.target.checked)}
+                />
+                <label htmlFor="optModernTemplate" className="text-sm">Use Modern Template</label>
               </div>
               <div className="border-t my-2" />
               <button

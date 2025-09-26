@@ -5,7 +5,6 @@ import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { registerSW } from 'virtual:pwa-register';
-import { Workbox } from 'workbox-window';
 import { updateLastActivityTime } from './lib/notificationService';
 import './index.css';
 
@@ -21,19 +20,6 @@ const handleUserActivity = () => {
   window.addEventListener(event, handleUserActivity, { passive: true });
 });
 
-// Register service worker for notifications
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('ServiceWorker registration successful');
-      })
-      .catch(err => {
-        console.error('ServiceWorker registration failed: ', err);
-      });
-  });
-}
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <SettingsProvider>
@@ -45,6 +31,49 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </SettingsProvider>
   </React.StrictMode>
 );
+
+// One-time cleanup: unregister legacy custom service worker and delete its caches
+async function cleanupLegacyServiceWorkers() {
+  try {
+    // Only run once per browser profile
+    if (localStorage.getItem('swCleanupDone') === 'true') {
+      return;
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const reg of regs) {
+        const script = reg.active?.scriptURL || reg.waiting?.scriptURL || reg.installing?.scriptURL || '';
+        // Unregister any legacy SW named /sw.js to avoid conflicts
+        if (script.endsWith('/sw.js')) {
+          await reg.unregister();
+          console.log('Unregistered legacy service worker:', script);
+        }
+      }
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      for (const key of keys) {
+        // Remove caches created by the legacy SW and stale workbox caches
+        if (
+          key.startsWith('xpense-tracker-') ||
+          key === 'activity-cache' ||
+          key === 'google-fonts-cache' ||
+          key === 'images-cache' ||
+          key === 'api-cache'
+        ) {
+          await caches.delete(key);
+          console.log('Deleted legacy/stale cache:', key);
+        }
+      }
+    }
+    localStorage.setItem('swCleanupDone', 'true');
+  } catch (e) {
+    console.warn('Legacy SW cleanup skipped due to error:', e);
+  }
+}
+
+// Run cleanup before registering the new PWA service worker
+cleanupLegacyServiceWorkers();
 
 // Register service worker for PWA functionality
 const updateSW = registerSW({
@@ -118,42 +147,61 @@ const updateSW = registerSW({
   },
   onRegistered(registration: ServiceWorkerRegistration | undefined) {
     console.log('Service Worker registered successfully');
+    // Verify only one service worker registration remains post-load
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        if (regs.length > 1) {
+          console.warn('Multiple service worker registrations found. Attempting to unregister extras...');
+          regs.forEach(reg => {
+            if (reg !== registration) {
+              reg.unregister();
+            }
+          });
+        }
+      });
+    }
   },
   onRegisterError(error) {
     console.error('Service worker registration failed:', error);
   }
 });
 
-// Advanced service worker error handling
-if ('serviceWorker' in navigator) {
+// Resilience: auto-recover once if a stale cached entry causes chunk load failure
+function setupChunkLoadRecovery() {
+  const reloadOnceKey = 'chunkLoadRecoveryReloaded';
+  const tryRecover = () => {
+    if (localStorage.getItem(reloadOnceKey) === 'true') return;
+    localStorage.setItem(reloadOnceKey, 'true');
+    // Prefer updating SW to refresh cache, fallback to hard reload
+    try {
+      updateSW(true);
+      // Give a tiny delay to let SW take control, then reload
+      setTimeout(() => window.location.reload(), 250);
+    } catch {
+      window.location.reload();
+    }
+  };
+
+  window.addEventListener('error', (e: ErrorEvent) => {
+    const msg = String(e?.error?.message || e.message || '');
+    if (msg.includes('ChunkLoadError') || msg.includes('Loading chunk') || msg.includes('Importing a module script failed')) {
+      console.warn('Detected chunk load error, attempting recovery...');
+      tryRecover();
+    }
+  });
+
+  window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
+    const msg = String((e?.reason && (e.reason.message || e.reason.toString())) || '');
+    if (msg.includes('ChunkLoadError') || msg.includes('Loading chunk') || msg.includes('Importing a module script failed')) {
+      console.warn('Detected chunk load error (promise), attempting recovery...');
+      tryRecover();
+    }
+  });
+
+  // Reset the guard flag after a successful load and some idle time
   window.addEventListener('load', () => {
-    const wb = new Workbox('/service-worker.js');
-    
-    // Track service worker state changes
-    wb.addEventListener('activated', (event) => {
-      // Check if there's a service worker update available
-      if (event.isUpdate) {
-        console.log('Service worker updated to latest version');
-      }
-    });
-    
-    // Handle service worker update found event
-    wb.addEventListener('waiting', (event) => {
-      console.log('New service worker is waiting to activate');
-      // This could trigger a custom UI notification
-    });
-    
-    // Handle service worker installation failure
-    wb.addEventListener('redundant', (event) => {
-      console.error('Service worker became redundant');
-      // Show a warning to the user that offline functionality might be compromised
-    });
-    
-    // Listen for unhandled exceptions in service worker
-    wb.addEventListener('message', (event) => {
-      if (event.data?.type === 'ERROR') {
-        console.error('Service worker error:', event.data.error);
-      }
-    });
+    setTimeout(() => localStorage.removeItem(reloadOnceKey), 30000);
   });
 }
+
+setupChunkLoadRecovery();
