@@ -1,3 +1,11 @@
+import { auth } from './firebase';
+import {
+  getAllCategories as repoGetAll,
+  upsertCategory as repoUpsert,
+  updateCategoryDoc as repoUpdate,
+  deleteCategoryDoc as repoDelete,
+} from './repositories/categoriesRepo';
+
 export interface Category {
   id: string;
   name: string;
@@ -20,8 +28,13 @@ const defaultCategories: Category[] = [
 
 export function getCategories(): Category[] {
   try {
+    const uid = auth.currentUser?.uid;
+    // Note: synchronous API; return cache/localStorage immediately.
+    // Firestore async fetching should be done by callers if needed.
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : defaultCategories;
+    const local = saved ? JSON.parse(saved) : defaultCategories;
+    // If signed in, we will not block here; recommend using repo/listener for live data.
+    return local;
   } catch (error) {
     console.error('Failed to get categories:', error);
     return defaultCategories;
@@ -30,15 +43,16 @@ export function getCategories(): Category[] {
 
 export function addCategory(name: string, type: 'revenue' | 'expense', color: string = '#6b7280'): void {
   try {
-    const categories = getCategories();
-    const newCategory: Category = {
-      id: crypto.randomUUID(),
-      name,
-      type,
-      color,
-    };
-    categories.push(newCategory);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    const uid = auth.currentUser?.uid;
+    const id = crypto.randomUUID();
+    if (uid) {
+      void repoUpsert(uid, { id, name, type, color });
+    } else {
+      const categories = getCategories();
+      const newCategory: Category = { id, name, type, color };
+      categories.push(newCategory);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    }
   } catch (error) {
     console.error('Failed to add category:', error);
   }
@@ -46,13 +60,17 @@ export function addCategory(name: string, type: 'revenue' | 'expense', color: st
 
 export function updateCategory(id: string, name: string, type: 'revenue' | 'expense', color?: string): void {
   try {
-    const categories = getCategories();
-    const index = categories.findIndex((c) => c.id === id);
-    if (index !== -1) {
-      // Preserve existing color if not provided
-      const existingColor = categories[index].color || '#6b7280';
-      categories[index] = { id, name, type, color: color || existingColor };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      void repoUpdate(uid, { id, name, type, color: color ?? undefined });
+    } else {
+      const categories = getCategories();
+      const index = categories.findIndex((c) => c.id === id);
+      if (index !== -1) {
+        const existingColor = categories[index].color || '#6b7280';
+        categories[index] = { id, name, type, color: color || existingColor };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+      }
     }
   } catch (error) {
     console.error('Failed to update category:', error);
@@ -61,9 +79,14 @@ export function updateCategory(id: string, name: string, type: 'revenue' | 'expe
 
 export function deleteCategory(id: string): void {
   try {
-    const categories = getCategories();
-    const updated = categories.filter((c) => c.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      void repoDelete(uid, id);
+    } else {
+      const categories = getCategories();
+      const updated = categories.filter((c) => c.id !== id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
   } catch (error) {
     console.error('Failed to delete category:', error);
   }

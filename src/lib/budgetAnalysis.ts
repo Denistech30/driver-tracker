@@ -1,4 +1,4 @@
-import { Transaction } from '../types';
+import { Transaction } from './storage';
 import { format, getMonth, getYear, getDate, getDaysInMonth } from 'date-fns';
 
 export interface BudgetAnalysis {

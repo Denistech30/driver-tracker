@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
-import { Transaction, getTransactions } from '../lib/storage';
+import { Transaction, getTransactions, deleteTransaction } from '../lib/storage';
 import { useSettings } from '../contexts/SettingsContext';
 
 interface TransactionModalProps {
@@ -40,9 +40,7 @@ function TransactionModal({ transaction, onClose }: TransactionModalProps) {
   };
 
   const handleDelete = () => {
-    const transactions = getTransactions();
-    const updated = transactions.filter((t) => t.id !== transaction.id);
-    localStorage.setItem('transactions', JSON.stringify(updated));
+    deleteTransaction(transaction.id);
     onClose();
   };
 

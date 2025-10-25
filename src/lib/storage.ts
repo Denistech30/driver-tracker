@@ -1,4 +1,12 @@
 import { updateLastTransactionTime } from './notificationService';
+import { auth } from './firebase';
+import {
+  listenAllTransactions,
+  upsertTransaction as repoUpsert,
+  updateTransactionDoc as repoUpdate,
+  deleteTransaction as repoDelete,
+} from './repositories/transactionsRepo';
+import type { Unsubscribe } from 'firebase/firestore';
 
 export interface Transaction {
   id: string;
@@ -7,31 +15,70 @@ export interface Transaction {
   category: string;
   date: string;
   description?: string;
+  recurring?: boolean;
+  recurringFrequency?: 'daily' | 'weekly' | 'monthly';
+  recurringEndDate?: string;
 }
 
 const STORAGE_KEY = 'transactions';
 
+// --- Firestore-backed cache and listener ---
+let cachedUid: string | null = null;
+let cachedTransactions: Transaction[] = [];
+let unsubscribe: Unsubscribe | null = null;
+
+function ensureListener() {
+  const uid = auth.currentUser?.uid || null;
+  if (!uid) {
+    // No Firebase user yet; keep local cache (possibly from localStorage) as fallback
+    teardownListener();
+    return;
+  }
+  if (cachedUid === uid && unsubscribe) return;
+  // Switch listener when uid changes
+  teardownListener();
+  cachedUid = uid;
+  unsubscribe = listenAllTransactions(uid, (txs) => {
+    cachedTransactions = txs;
+  });
+}
+
+function teardownListener() {
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+  }
+}
+
 export function getTransactions(): Transaction[] {
+  // Ensure Firestore listener is set for current user
+  ensureListener();
+  // Serve cached Firestore data; fallback to localStorage once before listener fills
+  if (cachedTransactions.length > 0) return cachedTransactions;
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];
-  } catch (error) {
-    console.error('Failed to get transactions:', error);
+  } catch {
     return [];
   }
 }
 
 export function addTransaction(transaction: Omit<Transaction, 'id'>): void {
   try {
-    const transactions = getTransactions();
-    const newTransaction: Transaction = {
-      ...transaction,
-      id: crypto.randomUUID(),
-    };
-    transactions.push(newTransaction);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-    // Record the time of the last created transaction for notification scheduling
-    const txTime = new Date(newTransaction.date).getTime();
+    ensureListener();
+    const uid = auth.currentUser?.uid;
+    const id = crypto.randomUUID();
+    if (uid) {
+      // Write to Firestore
+      void repoUpsert(uid, { ...transaction, id });
+    } else {
+      // Fallback local write if not signed in (should be rare)
+      const transactions = getTransactions();
+      const newTransaction: Transaction = { ...transaction, id };
+      transactions.push(newTransaction);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    }
+    const txTime = new Date(transaction.date).getTime();
     updateLastTransactionTime(Number.isFinite(txTime) ? txTime : undefined);
   } catch (error) {
     console.error('Failed to add transaction:', error);
@@ -50,16 +97,35 @@ export function getTransactionById(id: string): Transaction | undefined {
 
 export function updateTransaction(updatedTransaction: Transaction): void {
   try {
-    let transactions = getTransactions();
-    transactions = transactions.map(t => 
-      t.id === updatedTransaction.id ? updatedTransaction : t
-    );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-    // Updating a transaction counts as recent activity related to transactions
+    ensureListener();
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      void repoUpdate(uid, updatedTransaction);
+    } else {
+      let transactions = getTransactions();
+      transactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    }
     const txTime = new Date(updatedTransaction.date).getTime();
     updateLastTransactionTime(Number.isFinite(txTime) ? txTime : undefined);
   } catch (error) {
     console.error('Failed to update transaction:', error);
+  }
+}
+
+export function deleteTransaction(id: string): void {
+  try {
+    ensureListener();
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      void repoDelete(uid, id);
+    } else {
+      const transactions = getTransactions();
+      const updated = transactions.filter((t) => t.id !== id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+  } catch (error) {
+    console.error('Failed to delete transaction:', error);
   }
 }
 

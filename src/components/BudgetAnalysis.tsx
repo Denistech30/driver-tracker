@@ -1,6 +1,6 @@
 import React from 'react';
 import { useBudget } from '../contexts/BudgetContext';
-import { useLocalStorageTransactions } from '../hooks/useLocalStorageTransactions';
+import { useTransactions } from '../hooks/useTransactions';
 import { useSettings } from '../contexts/SettingsContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Progress } from './ui/progress';
@@ -13,7 +13,7 @@ export function BudgetAnalysis() {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
-  const allTransactions = useLocalStorageTransactions();
+  const { transactions: allTransactions } = useTransactions();
   const transactions = allTransactions.filter(t => {
     const date = new Date(t.date);
     return date.getMonth() === currentMonth && date.getFullYear() === currentYear && t.type === 'expense';

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { BudgetAnalysisService } from '../lib/budgetAnalysis';
-import type { Transaction } from '../types';
+import type { Transaction } from '../lib/storage';
 import type { BudgetAnalysis } from '../lib/budgetAnalysis';
 import { getMonthlyBudget, setMonthlyBudget } from '../lib/monthlyBudget';
 

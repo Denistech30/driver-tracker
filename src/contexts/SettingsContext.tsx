@@ -1,4 +1,6 @@
 import * as React from 'react';
+import { useFirebaseUser } from '../hooks/useFirebaseUser';
+import { getSettings as repoGetSettings, updateSettings as repoUpdateSettings, setMonthlyBudget as repoSetMonthlyBudget, getMonthlyBudget as repoGetMonthlyBudget } from '../lib/repositories/settingsRepo';
 
 interface Settings {
   language: string;
@@ -49,6 +51,7 @@ export function SettingsProvider({
   children: React.ReactNode;
   expenditures?: ExpenditureItem[];
 }) {
+  const { user } = useFirebaseUser();
   const [settings, setSettings] = React.useState<Settings>(defaultSettings);
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [showNotification, setShowNotification] = React.useState(false);
@@ -77,36 +80,54 @@ export function SettingsProvider({
     budgetColor = 'yellow';
   }
 
-  // Initialize settings from localStorage
+  // Initialize settings from Firestore if signed-in; fallback to localStorage otherwise
   React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const savedMonth = localStorage.getItem(BUDGET_MONTH_KEY);
-      const currentMonth = new Date().getMonth();
-      if (saved) {
-        const parsedSettings = JSON.parse(saved);
-        // Check if budget month matches current month
-        if (typeof parsedSettings.budget !== 'undefined') {
-          if (savedMonth && parseInt(savedMonth, 10) === currentMonth) {
-            // Persist budget for current month
-            setSettings(prev => ({ ...prev, ...parsedSettings }));
+    (async () => {
+      try {
+        const now = new Date();
+        const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (user?.uid) {
+          const remote = await repoGetSettings(user.uid);
+          const currentBudget = await repoGetMonthlyBudget(user.uid, ym);
+          if (remote) {
+            setSettings(prev => ({
+              ...prev,
+              language: remote.language,
+              currency: remote.currency,
+              theme: remote.theme,
+              availableQuestions: remote.availableQuestions,
+              budget: currentBudget || 0,
+            }));
           } else {
-            // New month, reset budget
-            setSettings(prev => ({ ...prev, ...parsedSettings, budget: 0 }));
-            localStorage.setItem(BUDGET_MONTH_KEY, currentMonth.toString());
+            setSettings(prev => ({ ...prev, budget: currentBudget || 0 }));
           }
         } else {
-          setSettings(prev => ({ ...prev, ...parsedSettings }));
+          const saved = localStorage.getItem(STORAGE_KEY);
+          const savedMonth = localStorage.getItem(BUDGET_MONTH_KEY);
+          const currentMonth = now.getMonth();
+          if (saved) {
+            const parsedSettings = JSON.parse(saved);
+            if (typeof parsedSettings.budget !== 'undefined') {
+              if (savedMonth && parseInt(savedMonth, 10) === currentMonth) {
+                setSettings(prev => ({ ...prev, ...parsedSettings }));
+              } else {
+                setSettings(prev => ({ ...prev, ...parsedSettings, budget: 0 }));
+                localStorage.setItem(BUDGET_MONTH_KEY, currentMonth.toString());
+              }
+            } else {
+              setSettings(prev => ({ ...prev, ...parsedSettings }));
+            }
+          } else {
+            localStorage.setItem(BUDGET_MONTH_KEY, currentMonth.toString());
+          }
         }
-      } else {
-        localStorage.setItem(BUDGET_MONTH_KEY, currentMonth.toString());
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      } finally {
+        setIsInitialized(true);
       }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    } finally {
-      setIsInitialized(true);
-    }
-  }, []);
+    })();
+  }, [user?.uid]);
 
   // Check last app open time and set notification
   React.useEffect(() => {
@@ -130,38 +151,44 @@ export function SettingsProvider({
     }
   }, [isInitialized]);
 
-  // Save settings to localStorage
+  // Apply theme and language when settings change
   React.useEffect(() => {
     if (!isInitialized) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-      // Persist budget month if budget is set
-      if (typeof settings.budget !== 'undefined') {
-        localStorage.setItem(BUDGET_MONTH_KEY, new Date().getMonth().toString());
-      }
-      // Apply theme to document
       if (settings.theme === 'dark') {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
       }
-      
-      // Apply language to document
       document.documentElement.lang = settings.language.split('-')[0];
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error('Error applying settings:', error);
     }
-  }, [settings, isInitialized]);
+  }, [settings.theme, settings.language, isInitialized]);
 
   const updateSettings = (newSettings: Partial<Settings>) => {
-    setSettings((prev) => {
-      const updated = { ...prev, ...newSettings };
-      // If budget is manually edited, update month
+    setSettings((prev) => ({ ...prev, ...newSettings }));
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    if (user?.uid) {
       if (typeof newSettings.budget !== 'undefined') {
-        localStorage.setItem(BUDGET_MONTH_KEY, new Date().getMonth().toString());
+        void repoSetMonthlyBudget(user.uid, ym, newSettings.budget || 0);
       }
-      return updated;
-    });
+      const { budget, ...rest } = newSettings;
+      if (Object.keys(rest).length > 0) {
+        void repoUpdateSettings(user.uid, rest as any);
+      }
+    } else {
+      try {
+        const merged = { ...settings, ...newSettings };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        if (typeof newSettings.budget !== 'undefined') {
+          localStorage.setItem(BUDGET_MONTH_KEY, now.getMonth().toString());
+        }
+      } catch (e) {
+        console.error('Error saving settings locally:', e);
+      }
+    }
   };
 
   return (

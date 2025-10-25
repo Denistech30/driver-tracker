@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { initEmailService } from './lib/emailService';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import PinModal from './components/PinModal';
 import Overview from './pages/Overview';
@@ -9,13 +9,19 @@ import AddTransaction from './pages/AddTransaction';
 import Reports from './pages/Reports';
 import Calendar from './pages/Calendar';
 import Categories from './pages/Categories';
+import BudgetGoals from './pages/BudgetGoals';
 import Settings from './pages/Settings';
 import NotificationTest from './pages/NotificationTest';
+import Dashboard from './pages/Dashboard';
 import { Toaster } from './components/ui/toaster';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useSettings } from './contexts/SettingsContext';
 import { BudgetProvider } from './contexts/BudgetContext';
+import { BudgetEnhancedProvider } from './contexts/BudgetEnhancedContext';
 import useInactivityNotification from './hooks/useInactivityNotification';
+import { useFirebaseUser } from './hooks/useFirebaseUser';
+import Auth from './pages/Auth';
+import { runLocalToFirestoreMigration } from './lib/migrate';
 
 // AppContent handles routing and app lock logic
 function AppContent() {
@@ -24,12 +30,16 @@ function AppContent() {
   
   return (
     <BudgetProvider>
-      <AppContentInner />
+      <BudgetEnhancedProvider>
+        <AppContentInner />
+      </BudgetEnhancedProvider>
     </BudgetProvider>
   );
 }
 
 function AppContentInner() {
+  // Firebase auth state for data access and sync
+  const { user, loading } = useFirebaseUser();
   const { isAppLocked, lockApp, auth, pinFeatureEnabled } = useAuth();
   const { settings } = useSettings(); 
 
@@ -53,8 +63,6 @@ function AppContentInner() {
       }, INACTIVITY_DURATION_MS);
     }
   }, [auth.isAuthenticated, pinFeatureEnabled, isAppLocked, lockApp]);
-
-  
 
   // --- App Lifecycle Listeners ---
   // Define memoized handlers to avoid dependency issues
@@ -140,6 +148,40 @@ function AppContentInner() {
     };
   }, [handleUserActivity, pinFeatureEnabled, auth.isAuthenticated, lockApp, resetInactivityTimer]);
 
+  // One-time localStorage -> Firestore migration once signed in
+  useEffect(() => {
+    (async () => {
+      if (user?.uid) {
+        try {
+          await runLocalToFirestoreMigration(user.uid);
+        } catch (e) {
+          console.warn('Migration skipped or failed', e);
+        }
+      }
+    })();
+  }, [user?.uid]);
+
+  // Loading state while Firebase checks current user
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-sm text-muted-foreground">Loading…</div>
+      </div>
+    );
+  }
+
+  // If no Firebase user, show only the Auth route and redirect others to /auth
+  if (!user) {
+    return (
+      <>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="*" element={<Navigate to="/auth" replace />} />
+        </Routes>
+        <Toaster />
+      </>
+    );
+  }
 
   return (
     <>
@@ -153,15 +195,19 @@ function AppContentInner() {
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Overview />} />
+            <Route path="dashboard" element={<Dashboard />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="add-transaction" element={<AddTransaction />} />
             <Route path="transactions/edit/:transactionId" element={<AddTransaction />} />
             <Route path="reports" element={<Reports />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="categories" element={<Categories />} />
+            <Route path="budget-goals" element={<BudgetGoals />} />
             <Route path="settings" element={<Settings />} />
             <Route path="notification-test" element={<NotificationTest />} />
           </Route>
+          {/* Ensure /auth remains available even when signed-in (optional) */}
+          <Route path="/auth" element={<Navigate to="/" replace />} />
         </Routes>
       )}
       <Toaster />

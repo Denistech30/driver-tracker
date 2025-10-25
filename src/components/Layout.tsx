@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { Home, List, Plus, FileText, Calendar as CalendarIcon, Tag, Settings as SettingsIcon } from 'lucide-react';
+import { Home, List, Plus, FileText, Target, Tag, Settings as SettingsIcon, Calendar as CalendarIcon } from 'lucide-react';
+import AccountMenu from './AccountMenu';
 import InstallPrompt from './InstallPrompt';
 
 interface NavItem {
@@ -13,7 +14,7 @@ const navigation: NavItem[] = [
   { name: 'Transactions', path: '/transactions', icon: List },
   { name: 'Add', path: '/add-transaction', icon: Plus },
   { name: 'Reports', path: '/reports', icon: FileText },
-  { name: 'Calendar', path: '/calendar', icon: CalendarIcon },
+  { name: 'Budget', path: '/budget-goals', icon: Target },
 ];
 
 function Layout() {
@@ -30,27 +31,20 @@ function Layout() {
             <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:hidden">Xpense</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <AccountMenu />
+            <NavLink 
+              to="/calendar" 
+              className={({ isActive }) => `p-2 rounded-md ${isActive ? 'bg-gray-100 dark:bg-gray-800 text-primary' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-100'}`} 
+              aria-label="Calendar"
+            >
+              <CalendarIcon className="h-5 w-5" />
+            </NavLink>
             <NavLink 
               to="/settings" 
               className={({ isActive }) => `p-2 rounded-md ${isActive ? 'bg-gray-100 dark:bg-gray-800 text-primary' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-100'}`} 
               aria-label="Settings"
             >
               <SettingsIcon className="h-5 w-5" />
-            </NavLink>
-            <NavLink 
-              to="/categories" 
-              className={({ isActive }) => `p-2 rounded-md hidden sm:flex items-center gap-1 ${isActive ? 'bg-gray-100 dark:bg-gray-800 text-primary' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-100'}`} 
-              aria-label="Categories"
-            >
-              <Tag className="h-4 w-4" />
-              <span>Categories</span>
-            </NavLink>
-            <NavLink 
-              to="/categories" 
-              className={({ isActive }) => `p-2 rounded-md sm:hidden ${isActive ? 'bg-gray-100 dark:bg-gray-800 text-primary' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:text-gray-100'}`} 
-              aria-label="Categories"
-            >
-              <Tag className="h-4 w-4" />
             </NavLink>
           </div>
         </div>
