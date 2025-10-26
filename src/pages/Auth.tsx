@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { Eye, EyeOff } from 'lucide-react';
 
 export default function Auth() {
@@ -137,6 +137,24 @@ export default function Auth() {
             <button onClick={() => setMode(mode==='signin' ? 'signup' : 'signin')} className="text-gray-600 hover:text-gray-900">
               {mode==='signin' ? 'Create an account' : 'Have an account? Sign in'}
             </button>
+          </div>
+
+          {/* Debug Section - Remove after fixing */}
+          <div className="mt-6 p-4 bg-gray-100 rounded-lg text-xs">
+            <h3 className="font-bold mb-2">🔍 Debug Info (Remove after fixing)</h3>
+            <div className="space-y-1">
+              <div>API_KEY: {import.meta.env.VITE_FIREBASE_API_KEY ? '✅ SET' : '❌ NOT SET'}</div>
+              <div>AUTH_DOMAIN: {import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? '✅ SET' : '❌ NOT SET'}</div>
+              <div>PROJECT_ID: {import.meta.env.VITE_FIREBASE_PROJECT_ID ? '✅ SET' : '❌ NOT SET'}</div>
+              <div>STORAGE_BUCKET: {import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ? '✅ SET' : '❌ NOT SET'}</div>
+              <div>MESSAGING_SENDER_ID: {import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ? '✅ SET' : '❌ NOT SET'}</div>
+              <div>APP_ID: {import.meta.env.VITE_FIREBASE_APP_ID ? '✅ SET' : '❌ NOT SET'}</div>
+              <div>MEASUREMENT_ID: {import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ? '✅ SET' : '❌ NOT SET'}</div>
+              <div className="mt-2 pt-2 border-t">
+                <div>Auth Available: {auth ? '✅ YES' : '❌ NO'}</div>
+                <div>Error: {error || 'None'}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
