@@ -55,8 +55,15 @@ function teardownListener() {
 export function getTransactions(): Transaction[] {
   // Ensure Firestore listener is set for current user
   ensureListener();
-  // Serve cached Firestore data; fallback to localStorage once before listener fills
-  if (cachedTransactions.length > 0) return cachedTransactions;
+  
+  const uid = auth?.currentUser?.uid;
+  
+  // If user is authenticated, only return Firestore data (don't mix with localStorage)
+  if (uid) {
+    return cachedTransactions; // Return empty array for new users until Firestore loads
+  }
+  
+  // Only use localStorage for non-authenticated users
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];

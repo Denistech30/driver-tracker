@@ -30,12 +30,16 @@ const defaultCategories: Category[] = [
 export function getCategories(): Category[] {
   try {
     const uid = auth?.currentUser?.uid;
-    // Note: synchronous API; return cache/localStorage immediately.
-    // Firestore async fetching should be done by callers if needed.
+    
+    // If user is authenticated, return default categories for new users
+    // (Real categories should come from useCategories hook with Firestore listener)
+    if (uid) {
+      return defaultCategories;
+    }
+    
+    // Only use localStorage for non-authenticated users
     const saved = localStorage.getItem(STORAGE_KEY);
-    const local = saved ? JSON.parse(saved) : defaultCategories;
-    // If signed in, we will not block here; recommend using repo/listener for live data.
-    return local;
+    return saved ? JSON.parse(saved) : defaultCategories;
   } catch (error) {
     console.error('Failed to get categories:', error);
     return defaultCategories;
