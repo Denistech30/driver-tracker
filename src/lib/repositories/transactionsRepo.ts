@@ -33,6 +33,10 @@ function mapDocToTransaction(id: string, data: any): Transaction {
 }
 
 export function listenAllTransactions(uid: string, cb: (txs: Transaction[]) => void): Unsubscribe {
+  if (!db) {
+    console.warn('Firestore not available, returning empty unsubscribe');
+    return () => {};
+  }
   const q = query(collection(db, transactionsCollectionPath(uid)), orderBy('date', 'desc'));
   return onSnapshot(
     q,
@@ -54,12 +58,20 @@ export function listenAllTransactions(uid: string, cb: (txs: Transaction[]) => v
 }
 
 export async function getAllTransactions(uid: string): Promise<Transaction[]> {
+  if (!db) {
+    console.warn('Firestore not available, returning empty array');
+    return [];
+  }
   const q = query(collection(db, transactionsCollectionPath(uid)), orderBy('date', 'desc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => mapDocToTransaction(d.id, d.data()));
 }
 
 export async function getTransaction(uid: string, id: string): Promise<Transaction | null> {
+  if (!db) {
+    console.warn('Firestore not available, returning null');
+    return null;
+  }
   const ref = doc(db, transactionsCollectionPath(uid), id);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
@@ -68,6 +80,10 @@ export async function getTransaction(uid: string, id: string): Promise<Transacti
 
 export async function upsertTransaction(uid: string, tx: TransactionInput): Promise<string> {
   const id = tx.id ?? crypto.randomUUID();
+  if (!db) {
+    console.warn('Firestore not available, skipping upsert');
+    return id;
+  }
   const ref = doc(db, transactionsCollectionPath(uid), id);
   await setDoc(ref, {
     type: tx.type,
@@ -82,6 +98,10 @@ export async function upsertTransaction(uid: string, tx: TransactionInput): Prom
 }
 
 export async function updateTransactionDoc(uid: string, tx: Transaction): Promise<void> {
+  if (!db) {
+    console.warn('Firestore not available, skipping update');
+    return;
+  }
   const ref = doc(db, transactionsCollectionPath(uid), tx.id);
   await updateDoc(ref, {
     type: tx.type,
@@ -94,6 +114,10 @@ export async function updateTransactionDoc(uid: string, tx: Transaction): Promis
 }
 
 export async function deleteTransaction(uid: string, id: string): Promise<void> {
+  if (!db) {
+    console.warn('Firestore not available, skipping delete');
+    return;
+  }
   const ref = doc(db, transactionsCollectionPath(uid), id);
   await deleteDoc(ref);
 }

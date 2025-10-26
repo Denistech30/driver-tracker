@@ -28,6 +28,11 @@ export default function AccountMenu() {
   const initials = (user?.email || 'U').slice(0, 1).toUpperCase();
 
   const handleLogout = async () => {
+    if (!auth) {
+      console.warn('Firebase auth not available');
+      return;
+    }
+    
     try {
       await signOut(auth);
     } catch (e) {

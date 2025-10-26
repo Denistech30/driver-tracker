@@ -9,6 +9,13 @@ import {
 } from 'firebase/firestore';
 import { getAnalytics, isSupported as analyticsIsSupported, type Analytics } from 'firebase/analytics';
 
+// Check if Firebase environment variables are configured
+const isFirebaseConfigured = Boolean(
+  import.meta.env.VITE_FIREBASE_API_KEY &&
+  import.meta.env.VITE_FIREBASE_AUTH_DOMAIN &&
+  import.meta.env.VITE_FIREBASE_PROJECT_ID
+);
+
 // Read config from Vite env to avoid hardcoding
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
@@ -20,39 +27,61 @@ const firebaseConfig = {
   measurementId: (import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string) || undefined,
 };
 
-// Initialize or reuse app
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-
-// Initialize Firestore with offline persistence
-let db: Firestore;
-try {
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentSingleTabManager({}),
-    }),
-  });
-} catch {
-  // Fallback to default Firestore instance if initializeFirestore already called elsewhere
-  db = getFirestore(app);
+// Initialize or reuse app only if Firebase is configured
+let app: any = null;
+if (isFirebaseConfigured) {
+  try {
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  } catch (error) {
+    console.warn('Firebase initialization failed:', error);
+  }
 }
 
-// Initialize Auth and persist sessions in local storage
-const auth: Auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch(() => {
-  // Non-fatal if persistence cannot be set (private browsing, etc.)
-});
+// Initialize Firestore with offline persistence (only if Firebase is configured)
+let db: Firestore | null = null;
+if (app && isFirebaseConfigured) {
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentSingleTabManager({}),
+      }),
+    });
+  } catch {
+    // Fallback to default Firestore instance if initializeFirestore already called elsewhere
+    try {
+      db = getFirestore(app);
+    } catch (error) {
+      console.warn('Firestore initialization failed:', error);
+    }
+  }
+}
+
+// Initialize Auth and persist sessions in local storage (only if Firebase is configured)
+let auth: Auth | null = null;
+if (app && isFirebaseConfigured) {
+  try {
+    auth = getAuth(app);
+    setPersistence(auth, browserLocalPersistence).catch(() => {
+      // Non-fatal if persistence cannot be set (private browsing, etc.)
+    });
+  } catch (error) {
+    console.warn('Auth initialization failed:', error);
+  }
+}
 
 // Initialize Analytics only when supported, not during SSR, and only in production
 let analytics: Analytics | null = null;
-(async () => {
-  try {
-    if (import.meta.env.MODE === 'production' && (await analyticsIsSupported())) {
-      analytics = getAnalytics(app);
+if (app && isFirebaseConfigured) {
+  (async () => {
+    try {
+      if (import.meta.env.MODE === 'production' && (await analyticsIsSupported())) {
+        analytics = getAnalytics(app);
+      }
+    } catch {
+      // Ignore analytics init errors (e.g., unsupported environment)
     }
-  } catch {
-    // Ignore analytics init errors (e.g., unsupported environment)
-  }
-})();
+  })();
+}
 
 // Utilities to help construct user-scoped paths
 export const userCollectionPath = (uid: string) => `users/${uid}`;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Transaction } from '../lib/storage';
+import { getTransactions } from '../lib/storage';
 import { useFirebaseUser } from './useFirebaseUser';
 import { listenAllTransactions, type Unsubscribe } from '../lib/repositories/transactionsRepo';
 
@@ -18,8 +19,14 @@ export function useTransactions(): { transactions: Transaction[]; loading: boole
         setLoading(false);
       });
     } else {
-      // No Firebase user yet; keep empty list
-      setTransactions([]);
+      // Fallback to localStorage when Firebase is not available or user not signed in
+      try {
+        const localTransactions = getTransactions();
+        setTransactions(localTransactions);
+      } catch (error) {
+        console.warn('Failed to load local transactions:', error);
+        setTransactions([]);
+      }
       setLoading(false);
     }
     

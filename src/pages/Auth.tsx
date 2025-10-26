@@ -13,10 +13,17 @@ export default function Auth() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
+    if (!auth) {
+      setError('Authentication service not available');
+      setLoading(false);
+      return;
+    }
+    
     try {
       if (mode === 'signup') {
         await createUserWithEmailAndPassword(auth, email, password);
@@ -29,13 +36,19 @@ export default function Auth() {
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   async function handleForgot() {
     if (!email) {
       setError('Enter your email to reset password');
       return;
     }
+    
+    if (!auth) {
+      setError('Authentication service not available');
+      return;
+    }
+    
     try {
       setLoading(true);
       setError('');

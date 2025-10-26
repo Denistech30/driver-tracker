@@ -1,11 +1,13 @@
 import { updateLastTransactionTime } from './notificationService';
 import { auth } from './firebase';
 import {
-  listenAllTransactions,
+  getAllTransactions as repoGetAll,
   upsertTransaction as repoUpsert,
   updateTransactionDoc as repoUpdate,
   deleteTransaction as repoDelete,
+  listenAllTransactions,
 } from './repositories/transactionsRepo';
+import { addToOfflineQueue, isOnline } from './offlineSync';
 import type { Unsubscribe } from 'firebase/firestore';
 
 export interface Transaction {
@@ -28,7 +30,7 @@ let cachedTransactions: Transaction[] = [];
 let unsubscribe: Unsubscribe | null = null;
 
 function ensureListener() {
-  const uid = auth.currentUser?.uid || null;
+  const uid = auth?.currentUser?.uid || null;
   if (!uid) {
     // No Firebase user yet; keep local cache (possibly from localStorage) as fallback
     teardownListener();
@@ -66,18 +68,27 @@ export function getTransactions(): Transaction[] {
 export function addTransaction(transaction: Omit<Transaction, 'id'>): void {
   try {
     ensureListener();
-    const uid = auth.currentUser?.uid;
+    const uid = auth?.currentUser?.uid;
     const id = crypto.randomUUID();
-    if (uid) {
-      // Write to Firestore
-      void repoUpsert(uid, { ...transaction, id });
-    } else {
-      // Fallback local write if not signed in (should be rare)
-      const transactions = getTransactions();
-      const newTransaction: Transaction = { ...transaction, id };
-      transactions.push(newTransaction);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    const newTransaction: Transaction = { ...transaction, id };
+    
+    // Always save to localStorage first (for offline support)
+    const transactions = getTransactions();
+    transactions.push(newTransaction);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    
+    if (uid && isOnline() && auth && repoUpsert) {
+      // Write to Firestore if online and authenticated
+      void repoUpsert(uid, newTransaction);
+    } else if (uid) {
+      // Queue for offline sync if authenticated but offline
+      addToOfflineQueue({
+        type: 'transaction',
+        operation: 'create',
+        data: newTransaction
+      });
     }
+    
     const txTime = new Date(transaction.date).getTime();
     updateLastTransactionTime(Number.isFinite(txTime) ? txTime : undefined);
   } catch (error) {
@@ -98,14 +109,25 @@ export function getTransactionById(id: string): Transaction | undefined {
 export function updateTransaction(updatedTransaction: Transaction): void {
   try {
     ensureListener();
-    const uid = auth.currentUser?.uid;
-    if (uid) {
+    const uid = auth?.currentUser?.uid;
+    
+    // Always update localStorage first (for offline support)
+    let transactions = getTransactions();
+    transactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    
+    if (uid && isOnline() && auth && repoUpdate) {
+      // Update in Firestore if online and authenticated
       void repoUpdate(uid, updatedTransaction);
-    } else {
-      let transactions = getTransactions();
-      transactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    } else if (uid) {
+      // Queue for offline sync if authenticated but offline
+      addToOfflineQueue({
+        type: 'transaction',
+        operation: 'update',
+        data: updatedTransaction
+      });
     }
+    
     const txTime = new Date(updatedTransaction.date).getTime();
     updateLastTransactionTime(Number.isFinite(txTime) ? txTime : undefined);
   } catch (error) {
@@ -116,13 +138,23 @@ export function updateTransaction(updatedTransaction: Transaction): void {
 export function deleteTransaction(id: string): void {
   try {
     ensureListener();
-    const uid = auth.currentUser?.uid;
-    if (uid) {
+    const uid = auth?.currentUser?.uid;
+    
+    // Always delete from localStorage first (for offline support)
+    const transactions = getTransactions();
+    const updated = transactions.filter((t) => t.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    
+    if (uid && isOnline() && auth && repoDelete) {
+      // Delete from Firestore if online and authenticated
       void repoDelete(uid, id);
-    } else {
-      const transactions = getTransactions();
-      const updated = transactions.filter((t) => t.id !== id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } else if (uid) {
+      // Queue for offline sync if authenticated but offline
+      addToOfflineQueue({
+        type: 'transaction',
+        operation: 'delete',
+        data: { id }
+      });
     }
   } catch (error) {
     console.error('Failed to delete transaction:', error);

@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { Home, List, Plus, FileText, Target, Tag, Settings as SettingsIcon, Calendar as CalendarIcon } from 'lucide-react';
 import AccountMenu from './AccountMenu';
+import SyncStatus from './SyncStatus';
 import InstallPrompt from './InstallPrompt';
 
 interface NavItem {
@@ -31,6 +32,7 @@ function Layout() {
             <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:hidden">Xpense</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <SyncStatus />
             <AccountMenu />
             <NavLink 
               to="/calendar" 

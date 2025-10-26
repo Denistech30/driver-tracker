@@ -5,6 +5,7 @@ import {
   updateCategoryDoc as repoUpdate,
   deleteCategoryDoc as repoDelete,
 } from './repositories/categoriesRepo';
+import { addToOfflineQueue, isOnline } from './offlineSync';
 
 export interface Category {
   id: string;
@@ -43,15 +44,25 @@ export function getCategories(): Category[] {
 
 export function addCategory(name: string, type: 'revenue' | 'expense', color: string = '#6b7280'): void {
   try {
-    const uid = auth.currentUser?.uid;
+    const uid = auth?.currentUser?.uid;
     const id = crypto.randomUUID();
-    if (uid) {
-      void repoUpsert(uid, { id, name, type, color });
-    } else {
-      const categories = getCategories();
-      const newCategory: Category = { id, name, type, color };
-      categories.push(newCategory);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    const newCategory: Category = { id, name, type, color };
+    
+    // Always save to localStorage first (for offline support)
+    const categories = getCategories();
+    categories.push(newCategory);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    
+    if (uid && isOnline() && auth && repoUpsert) {
+      // Save to Firestore if online and authenticated
+      void repoUpsert(uid, newCategory);
+    } else if (uid) {
+      // Queue for offline sync if authenticated but offline
+      addToOfflineQueue({
+        type: 'category',
+        operation: 'create',
+        data: newCategory
+      });
     }
   } catch (error) {
     console.error('Failed to add category:', error);

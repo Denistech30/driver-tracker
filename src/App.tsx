@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { initEmailService } from './lib/emailService';
+import { setupAutoSync } from './lib/offlineSync';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import PinModal from './components/PinModal';
@@ -217,11 +218,15 @@ function AppContentInner() {
 
 // Wrapper to provide contexts to the entire application
 function App() {
-  // Initialize EmailJS service when the app starts
+  // Initialize EmailJS service and offline sync when the app starts
   useEffect(() => {
     // Initialize the email service
     initEmailService();
     console.log('EmailJS service initialized');
+    
+    // Initialize offline sync system
+    setupAutoSync();
+    console.log('Offline sync system initialized');
   }, []);
 
   return (

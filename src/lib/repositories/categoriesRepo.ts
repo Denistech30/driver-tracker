@@ -29,6 +29,10 @@ function mapDocToCategory(id: string, data: any): Category {
 }
 
 export function listenAllCategories(uid: string, cb: (items: Category[]) => void): Unsubscribe {
+  if (!db) {
+    console.warn('Firestore not available, returning empty unsubscribe');
+    return () => {};
+  }
   const q = query(collection(db, categoriesCollectionPath(uid)), orderBy('name', 'asc'));
   return onSnapshot(
     q,
@@ -50,6 +54,10 @@ export function listenAllCategories(uid: string, cb: (items: Category[]) => void
 }
 
 export async function getAllCategories(uid: string): Promise<Category[]> {
+  if (!db) {
+    console.warn('Firestore not available, returning empty array');
+    return [];
+  }
   const q = query(collection(db, categoriesCollectionPath(uid)), orderBy('name', 'asc'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => mapDocToCategory(d.id, d.data()));
@@ -57,6 +65,10 @@ export async function getAllCategories(uid: string): Promise<Category[]> {
 
 export async function upsertCategory(uid: string, input: CategoryInput): Promise<string> {
   const id = input.id ?? crypto.randomUUID();
+  if (!db) {
+    console.warn('Firestore not available, skipping upsert');
+    return id;
+  }
   const ref = doc(db, categoriesCollectionPath(uid), id);
   await setDoc(ref, {
     name: input.name,
@@ -69,6 +81,10 @@ export async function upsertCategory(uid: string, input: CategoryInput): Promise
 }
 
 export async function updateCategoryDoc(uid: string, cat: Category): Promise<void> {
+  if (!db) {
+    console.warn('Firestore not available, skipping update');
+    return;
+  }
   const ref = doc(db, categoriesCollectionPath(uid), cat.id);
   await updateDoc(ref, {
     name: cat.name,
@@ -79,6 +95,10 @@ export async function updateCategoryDoc(uid: string, cat: Category): Promise<voi
 }
 
 export async function deleteCategoryDoc(uid: string, id: string): Promise<void> {
+  if (!db) {
+    console.warn('Firestore not available, skipping delete');
+    return;
+  }
   const ref = doc(db, categoriesCollectionPath(uid), id);
   await deleteDoc(ref);
 }
