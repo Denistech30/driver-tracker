@@ -29,7 +29,7 @@ const defaultCategories: Category[] = [
 
 export function getCategories(): Category[] {
   try {
-    const uid = auth.currentUser?.uid;
+    const uid = auth?.currentUser?.uid;
     // Note: synchronous API; return cache/localStorage immediately.
     // Firestore async fetching should be done by callers if needed.
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -71,7 +71,7 @@ export function addCategory(name: string, type: 'revenue' | 'expense', color: st
 
 export function updateCategory(id: string, name: string, type: 'revenue' | 'expense', color?: string): void {
   try {
-    const uid = auth.currentUser?.uid;
+    const uid = auth?.currentUser?.uid;
     if (uid) {
       void repoUpdate(uid, { id, name, type, color: color ?? undefined });
     } else {
@@ -90,7 +90,7 @@ export function updateCategory(id: string, name: string, type: 'revenue' | 'expe
 
 export function deleteCategory(id: string): void {
   try {
-    const uid = auth.currentUser?.uid;
+    const uid = auth?.currentUser?.uid;
     if (uid) {
       void repoDelete(uid, id);
     } else {

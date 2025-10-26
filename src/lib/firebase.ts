@@ -89,5 +89,34 @@ export const transactionsCollectionPath = (uid: string) => `${userCollectionPath
 export const categoriesCollectionPath = (uid: string) => `${userCollectionPath(uid)}/categories`;
 export const settingsDocPath = (uid: string) => `${userCollectionPath(uid)}/settings/settings`;
 
-export { app, auth, db };
+// Safe Firebase utilities
+export function getFirebaseAuth(): Auth {
+  if (!auth) {
+    throw new Error('Firebase Auth is not available. Please check your Firebase configuration.');
+  }
+  return auth;
+}
+
+export function getFirebaseDb(): Firestore {
+  if (!db) {
+    throw new Error('Firestore is not available. Please check your Firebase configuration.');
+  }
+  return db;
+}
+
+// Check if Firebase services are available
+export function isAuthAvailable(): boolean {
+  return auth !== null;
+}
+
+export function isDbAvailable(): boolean {
+  return db !== null;
+}
+
+export function isFirebaseAvailable(): boolean {
+  return isFirebaseConfigured && app !== null;
+}
+
+// Export the original instances for backward compatibility and null checks
+export { app, auth, db, isFirebaseConfigured };
 export type { Analytics };

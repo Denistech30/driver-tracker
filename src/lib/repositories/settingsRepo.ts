@@ -16,6 +16,10 @@ export interface SettingsDoc {
 }
 
 export async function getSettings(uid: string): Promise<SettingsDoc | null> {
+  if (!db) {
+    console.warn('Firestore not available, returning null');
+    return null;
+  }
   const ref = doc(db, settingsDocPath(uid));
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
@@ -34,6 +38,10 @@ export async function getSettings(uid: string): Promise<SettingsDoc | null> {
 }
 
 export async function setSettings(uid: string, settings: SettingsDoc): Promise<void> {
+  if (!db) {
+    console.warn('Firestore not available, skipping setSettings');
+    return;
+  }
   const ref = doc(db, settingsDocPath(uid));
   await setDoc(ref, {
     ...settings,
@@ -43,6 +51,10 @@ export async function setSettings(uid: string, settings: SettingsDoc): Promise<v
 }
 
 export async function updateSettings(uid: string, patch: Partial<SettingsDoc>): Promise<void> {
+  if (!db) {
+    console.warn('Firestore not available, skipping updateSettings');
+    return;
+  }
   const ref = doc(db, settingsDocPath(uid));
   await updateDoc(ref, {
     ...patch,
@@ -51,6 +63,10 @@ export async function updateSettings(uid: string, patch: Partial<SettingsDoc>): 
 }
 
 export async function setMonthlyBudget(uid: string, yearMonth: string, amount: number): Promise<void> {
+  if (!db) {
+    console.warn('Firestore not available, skipping setMonthlyBudget');
+    return;
+  }
   const ref = doc(db, settingsDocPath(uid));
   await setDoc(ref, {
     budgetMonthly: { [yearMonth]: amount },
@@ -60,6 +76,10 @@ export async function setMonthlyBudget(uid: string, yearMonth: string, amount: n
 }
 
 export async function getMonthlyBudget(uid: string, yearMonth: string): Promise<number> {
+  if (!db) {
+    console.warn('Firestore not available, returning 0');
+    return 0;
+  }
   const ref = doc(db, settingsDocPath(uid));
   const snap = await getDoc(ref);
   const data = (snap.exists() ? (snap.data() as SettingsDoc) : null);
