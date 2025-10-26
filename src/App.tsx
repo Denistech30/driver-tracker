@@ -14,6 +14,7 @@ import BudgetGoals from './pages/BudgetGoals';
 import Settings from './pages/Settings';
 import NotificationTest from './pages/NotificationTest';
 import Dashboard from './pages/Dashboard';
+import Debug from './pages/Debug';
 import { Toaster } from './components/ui/toaster';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useSettings } from './contexts/SettingsContext';
@@ -206,6 +207,7 @@ function AppContentInner() {
             <Route path="budget-goals" element={<BudgetGoals />} />
             <Route path="settings" element={<Settings />} />
             <Route path="notification-test" element={<NotificationTest />} />
+            <Route path="debug" element={<Debug />} />
           </Route>
           {/* Ensure /auth remains available even when signed-in (optional) */}
           <Route path="/auth" element={<Navigate to="/" replace />} />
