@@ -1,0 +1,95 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can only access their own data
+    match /users/{userId} {
+      // Allow read/write access only to the authenticated user
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // User settings document
+      match /settings/{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Validate settings structure
+        allow write: if request.auth != null 
+          && request.auth.uid == userId
+          && validateSettings(resource.data);
+      }
+      
+      // User transactions collection
+      match /transactions/{transactionId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Validate transaction structure on write
+        allow create, update: if request.auth != null 
+          && request.auth.uid == userId
+          && validateTransaction(request.resource.data);
+      }
+      
+      // User categories collection  
+      match /categories/{categoryId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Validate category structure on write
+        allow create, update: if request.auth != null 
+          && request.auth.uid == userId
+          && validateCategory(request.resource.data);
+      }
+      
+      // User budget data
+      match /budgets/{budgetId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        
+        // Validate budget structure
+        allow create, update: if request.auth != null 
+          && request.auth.uid == userId
+          && validateBudget(request.resource.data);
+      }
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// Validation functions
+function validateTransaction(data) {
+  return data.keys().hasAll(['id', 'type', 'amount', 'category', 'date'])
+    && data.type in ['revenue', 'expense']
+    && data.amount is number
+    && data.amount >= 0
+    && data.category is string
+    && data.category.size() > 0
+    && data.date is string
+    && data.id is string
+    && data.id.size() > 0;
+}
+
+function validateCategory(data) {
+  return data.keys().hasAll(['id', 'name', 'type'])
+    && data.type in ['revenue', 'expense']
+    && data.name is string
+    && data.name.size() > 0
+    && data.id is string
+    && data.id.size() > 0;
+}
+
+function validateBudget(data) {
+  return data.keys().hasAll(['id', 'categoryName', 'allocated'])
+    && data.allocated is number
+    && data.allocated >= 0
+    && data.categoryName is string
+    && data.categoryName.size() > 0
+    && data.id is string
+    && data.id.size() > 0;
+}
+
+function validateSettings(data) {
+  return data.keys().hasAny(['currency', 'language', 'theme', 'availableQuestions'])
+    && ((!('currency' in data)) || data.currency is string)
+    && ((!('language' in data)) || data.language is string)
+    && ((!('theme' in data)) || data.theme in ['light', 'dark']);
+}

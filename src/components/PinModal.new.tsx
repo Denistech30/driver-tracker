@@ -188,21 +188,37 @@ const PinModal = ({ mode, onClose, onSuccess, availableQuestions }: PinModalProp
     }
   };
   
-  // Simulate sending recovery email
+  // Send actual recovery email using EmailJS
   const sendRecoveryEmail = async (code: string): Promise<boolean> => {
-    // In a real app, this would send an actual email
-    // For demo, we simulate email sending
-    
     if (!auth.recoveryEmail) {
       setError('No recovery email found. Please contact support.');
       return false;
     }
     
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    console.log(`[DEMO] Recovery code ${code} would be sent to ${auth.recoveryEmail}`);
-    return true;
+    try {
+      // Import the email service
+      const { sendRecoveryEmail: sendEmail, isEmailServiceAvailable } = await import('../lib/emailService');
+      
+      // Check if email service is configured
+      if (!isEmailServiceAvailable()) {
+        setError('Email service not configured. Please contact support.');
+        return false;
+      }
+      
+      // Send the actual email
+      const success = await sendEmail(auth.recoveryEmail, code);
+      
+      if (!success) {
+        setError('Failed to send recovery email. Please check your internet connection and try again.');
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error sending recovery email:', error);
+      setError('Failed to send recovery email. Please try again later.');
+      return false;
+    }
   };
   
   // Handle unlock request (when user enters PIN or security question)

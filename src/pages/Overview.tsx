@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { getCurrentMonthSummary, getCurrentMonthExpenseCategories } from '../lib/storage';
@@ -77,9 +77,26 @@ const Sparkline = ({ data, color = '#6366F1' }: { data: number[]; color?: string
   );
 };
 
-// Generate mock sparkline data (will be replaced with real data later)
-const generateSparklineData = () => {
-  return Array.from({ length: 7 }, () => Math.random() * 100 + 50);
+// Generate real sparkline data from transactions
+const generateSparklineData = (transactions: any[]) => {
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i));
+    return date;
+  });
+
+  return last7Days.map(date => {
+    const dayTransactions = transactions.filter(t => {
+      const txDate = new Date(t.date);
+      return txDate.toDateString() === date.toDateString();
+    });
+    
+    const dayTotal = dayTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    return dayTotal;
+  });
 };
 
 export default function Overview() {
@@ -154,12 +171,43 @@ export default function Overview() {
 
 
 
-  // Calculate today's data (mock for now - will be replaced with real data)
-  const todayData = {
-    spent: data.expenses * 0.1, // Rough estimate of today's spending
-    transactions: Math.max(1, Math.floor(data.expenseCategories.length * 0.3)),
-    lastTransaction: { name: 'Recent Purchase', amount: 25.50, time: '2 hours ago' }
-  };
+  // Calculate today's data from real transactions
+  const todayData = useMemo(() => {
+    const today = new Date();
+    const todayTransactions = transactions.filter(t => {
+      const txDate = new Date(t.date);
+      return txDate.toDateString() === today.toDateString();
+    });
+
+    const todaySpent = todayTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const lastTransaction = transactions
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    const getTimeAgo = (date: string) => {
+      const now = new Date();
+      const txDate = new Date(date);
+      const diffMs = now.getTime() - txDate.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffHours / 24);
+      
+      if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+      if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      return 'Just now';
+    };
+
+    return {
+      spent: todaySpent,
+      transactions: todayTransactions.length,
+      lastTransaction: lastTransaction ? {
+        name: lastTransaction.description || lastTransaction.category,
+        amount: lastTransaction.amount,
+        time: getTimeAgo(lastTransaction.date)
+      } : null
+    };
+  }, [transactions]);
 
   // Calculate week data
   const weekData = {
@@ -174,19 +222,19 @@ export default function Overview() {
       amount: data.revenue, 
       change: 10.4, 
       trend: 'up' as const, 
-      sparkline: generateSparklineData() 
+      sparkline: generateSparklineData(transactions.filter(t => t.type === 'revenue')) 
     },
     expenses: { 
       amount: data.expenses, 
       change: -5.2, 
       trend: 'down' as const, 
-      sparkline: generateSparklineData() 
+      sparkline: generateSparklineData(transactions.filter(t => t.type === 'expense')) 
     },
     net: { 
       amount: data.netIncome, 
       change: data.netIncome > 0 ? 15.8 : -8.3, 
       trend: data.netIncome > 0 ? 'up' as const : 'down' as const, 
-      sparkline: generateSparklineData() 
+      sparkline: generateSparklineData(transactions) 
     }
   };
 

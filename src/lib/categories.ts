@@ -27,19 +27,38 @@ const defaultCategories: Category[] = [
   { id: '8', name: 'Other', type: 'expense', color: '#6b7280' },
 ];
 
+// Helper function to get localStorage categories (for offline support)
+function getLocalStorageCategories(): Category[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : defaultCategories;
+  } catch (error) {
+    console.error('Failed to get categories from localStorage:', error);
+    return defaultCategories;
+  }
+}
+
+// Helper function to save to localStorage (for offline support)
+function saveCategoriesToLocalStorage(categories: Category[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+  } catch (error) {
+    console.error('Failed to save categories to localStorage:', error);
+  }
+}
+
 export function getCategories(): Category[] {
   try {
     const uid = auth?.currentUser?.uid;
     
-    // If user is authenticated, return default categories for new users
+    // For authenticated users, use localStorage for offline support
     // (Real categories should come from useCategories hook with Firestore listener)
     if (uid) {
-      return defaultCategories;
+      return getLocalStorageCategories();
     }
     
-    // Only use localStorage for non-authenticated users
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : defaultCategories;
+    // For non-authenticated users, use localStorage
+    return getLocalStorageCategories();
   } catch (error) {
     console.error('Failed to get categories:', error);
     return defaultCategories;
@@ -53,9 +72,9 @@ export function addCategory(name: string, type: 'revenue' | 'expense', color: st
     const newCategory: Category = { id, name, type, color };
     
     // Always save to localStorage first (for offline support)
-    const categories = getCategories();
+    const categories = getLocalStorageCategories();
     categories.push(newCategory);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    saveCategoriesToLocalStorage(categories);
     
     if (uid && isOnline() && auth && repoUpsert) {
       // Save to Firestore if online and authenticated
@@ -76,16 +95,26 @@ export function addCategory(name: string, type: 'revenue' | 'expense', color: st
 export function updateCategory(id: string, name: string, type: 'revenue' | 'expense', color?: string): void {
   try {
     const uid = auth?.currentUser?.uid;
-    if (uid) {
+    
+    // Always update localStorage first (for offline support)
+    const categories = getLocalStorageCategories();
+    const index = categories.findIndex((c) => c.id === id);
+    if (index !== -1) {
+      const existingColor = categories[index].color || '#6b7280';
+      categories[index] = { id, name, type, color: color || existingColor };
+      saveCategoriesToLocalStorage(categories);
+    }
+    
+    if (uid && isOnline() && auth && repoUpdate) {
+      // Update in Firestore if online and authenticated
       void repoUpdate(uid, { id, name, type, color: color ?? undefined });
-    } else {
-      const categories = getCategories();
-      const index = categories.findIndex((c) => c.id === id);
-      if (index !== -1) {
-        const existingColor = categories[index].color || '#6b7280';
-        categories[index] = { id, name, type, color: color || existingColor };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
-      }
+    } else if (uid) {
+      // Queue for offline sync if authenticated but offline
+      addToOfflineQueue({
+        type: 'category',
+        operation: 'update',
+        data: { id, name, type, color: color ?? undefined }
+      });
     }
   } catch (error) {
     console.error('Failed to update category:', error);
@@ -95,12 +124,22 @@ export function updateCategory(id: string, name: string, type: 'revenue' | 'expe
 export function deleteCategory(id: string): void {
   try {
     const uid = auth?.currentUser?.uid;
-    if (uid) {
+    
+    // Always delete from localStorage first (for offline support)
+    const categories = getLocalStorageCategories();
+    const updated = categories.filter((c) => c.id !== id);
+    saveCategoriesToLocalStorage(updated);
+    
+    if (uid && isOnline() && auth && repoDelete) {
+      // Delete from Firestore if online and authenticated
       void repoDelete(uid, id);
-    } else {
-      const categories = getCategories();
-      const updated = categories.filter((c) => c.id !== id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } else if (uid) {
+      // Queue for offline sync if authenticated but offline
+      addToOfflineQueue({
+        type: 'category',
+        operation: 'delete',
+        data: { id }
+      });
     }
   } catch (error) {
     console.error('Failed to delete category:', error);

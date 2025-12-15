@@ -21,6 +21,7 @@ export interface OfflineOperation {
   operation: 'create' | 'update' | 'delete';
   data: any;
   timestamp: number;
+  retryCount?: number;
 }
 
 const OFFLINE_QUEUE_KEY = 'offline-sync-queue';
@@ -62,6 +63,12 @@ export function removeFromQueue(operationId: string) {
   localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(filteredQueue));
 }
 
+export function updateOperationInQueue(operationId: string, updatedOperation: OfflineOperation) {
+  const queue = getOfflineQueue();
+  const updatedQueue = queue.map(op => op.id === operationId ? updatedOperation : op);
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(updatedQueue));
+}
+
 // Network status detection
 export function isOnline(): boolean {
   return navigator.onLine;
@@ -99,11 +106,22 @@ export async function syncOfflineOperations(): Promise<void> {
       console.error('Failed to sync operation:', operation.id, error);
       errorCount++;
       
-      // Remove failed operations that are too old (7 days)
+      // Increment retry count for failed operations
+      const updatedOperation = { ...operation, retryCount: (operation.retryCount || 0) + 1 };
+      
+      // Remove operations that have failed too many times (5 retries) or are too old (7 days)
       const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-      if (operation.timestamp < sevenDaysAgo) {
+      const maxRetries = 5;
+      
+      if (operation.timestamp < sevenDaysAgo || updatedOperation.retryCount >= maxRetries) {
         removeFromQueue(operation.id);
-        console.log('Removed old failed operation:', operation.id);
+        console.log(`Removed failed operation: ${operation.id} (${updatedOperation.retryCount >= maxRetries ? 'max retries' : 'too old'})`);
+        
+        // Show user notification for permanently failed operations
+        showSyncErrorNotification(operation, updatedOperation.retryCount >= maxRetries ? 'max_retries' : 'expired');
+      } else {
+        // Update the operation with retry count
+        updateOperationInQueue(operation.id, updatedOperation);
       }
     }
   }
@@ -197,7 +215,7 @@ export function setupAutoSync() {
   }
 }
 
-// User notification
+// User notification for successful sync
 function showSyncNotification(count: number) {
   // Create a simple toast notification
   const toast = document.createElement('div');
@@ -210,9 +228,43 @@ function showSyncNotification(count: number) {
   setTimeout(() => {
     toast.style.opacity = '0';
     setTimeout(() => {
-      document.body.removeChild(toast);
+      if (document.body.contains(toast)) {
+        document.body.removeChild(toast);
+      }
     }, 300);
   }, 3000);
+}
+
+// User notification for sync errors
+function showSyncErrorNotification(operation: OfflineOperation, reason: 'max_retries' | 'expired') {
+  const toast = document.createElement('div');
+  toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300 max-w-sm';
+  
+  const reasonText = reason === 'max_retries' 
+    ? 'Failed to sync after multiple attempts' 
+    : 'Sync operation expired';
+  
+  toast.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span>⚠️</span>
+      <div>
+        <div class="font-semibold">Sync Failed</div>
+        <div class="text-sm opacity-90">${reasonText}: ${operation.type} ${operation.operation}</div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(toast);
+  
+  // Auto-remove after 5 seconds (longer for error messages)
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => {
+      if (document.body.contains(toast)) {
+        document.body.removeChild(toast);
+      }
+    }, 300);
+  }, 5000);
 }
 
 // Get sync status

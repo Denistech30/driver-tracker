@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { BudgetAnalysisService } from '../lib/budgetAnalysis';
+import { getMonthlyBudget, setMonthlyBudget } from '../lib/monthlyBudget';
+import { getTransactions } from '../lib/storage';
 import type { Transaction } from '../lib/storage';
 import type { BudgetAnalysis } from '../lib/budgetAnalysis';
-import { getMonthlyBudget, setMonthlyBudget } from '../lib/monthlyBudget';
 
 interface BudgetContextType {
   analysis: BudgetAnalysis | null;
@@ -22,8 +23,8 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateAnalysis = useCallback(async () => {
-    // Get transactions from storage (implement this based on your storage)
-    const transactions: Transaction[] = JSON.parse(localStorage.getItem('transactions') || '[]');
+    // Get transactions using proper data source (respects authentication)
+    const transactions: Transaction[] = getTransactions();
     
     if (budget > 0 && transactions.length > 0) {
       const service = new BudgetAnalysisService(budget);

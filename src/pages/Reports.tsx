@@ -280,12 +280,176 @@ function Reports() {
   };
 
   const handleDownloadPDF = async () => {
-    toast({
-      title: 'PDF Export',
-      description: 'PDF export feature coming soon! For now, use CSV export or print this page.',
-      variant: 'default',
-    });
-    // TODO: Implement PDF export with jspdf
+    try {
+      // Dynamic imports to reduce bundle size
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas')
+      ]);
+
+      toast({
+        title: 'Generating PDF',
+        description: 'Please wait while we prepare your report...',
+        variant: 'default',
+      });
+
+      // Create PDF document
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let yPosition = 20;
+
+      // Add header
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Financial Report', pageWidth / 2, yPosition, { align: 'center' });
+      
+      yPosition += 10;
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      const { start, end } = getDateRange();
+      pdf.text(`Period: ${format(start, 'MMM dd, yyyy')} - ${format(end, 'MMM dd, yyyy')}`, pageWidth / 2, yPosition, { align: 'center' });
+      
+      yPosition += 15;
+
+      // Add summary section
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Summary', 20, yPosition);
+      yPosition += 8;
+
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Total Revenue: ${formatCurrency(currentPeriod.revenue)}`, 20, yPosition);
+      yPosition += 6;
+      pdf.text(`Total Expenses: ${formatCurrency(currentPeriod.expenses)}`, 20, yPosition);
+      yPosition += 6;
+      pdf.text(`Net Income: ${formatCurrency(currentPeriod.net)}`, 20, yPosition);
+      yPosition += 6;
+
+      // Add trend information
+      if (previousPeriod.revenue > 0 || previousPeriod.expenses > 0) {
+        pdf.text(`Revenue Trend: ${Number(trends.revenue) >= 0 ? '+' : ''}${trends.revenue}%`, 20, yPosition);
+        yPosition += 6;
+        pdf.text(`Expense Trend: ${Number(trends.expenses) >= 0 ? '+' : ''}${trends.expenses}%`, 20, yPosition);
+        yPosition += 15;
+      } else {
+        yPosition += 10;
+      }
+
+      // Add category breakdown
+      if (categoryData.length > 0) {
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Category Breakdown', 20, yPosition);
+        yPosition += 8;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+
+        // Table headers
+        pdf.text('Category', 20, yPosition);
+        pdf.text('Type', 80, yPosition);
+        pdf.text('Amount', 120, yPosition);
+        pdf.text('Change', 160, yPosition);
+        yPosition += 6;
+
+        // Draw line under headers
+        pdf.line(20, yPosition - 2, 190, yPosition - 2);
+        yPosition += 2;
+
+        categoryData.forEach((cat) => {
+          if (yPosition > pageHeight - 30) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+
+          const change = getCategoryChange(cat);
+          pdf.text(cat.name.substring(0, 20), 20, yPosition);
+          pdf.text(cat.type, 80, yPosition);
+          pdf.text(formatCurrency(cat.current), 120, yPosition);
+          pdf.text(`${change.change >= 0 ? '+' : ''}${change.percent}%`, 160, yPosition);
+          yPosition += 6;
+        });
+        yPosition += 10;
+      }
+
+      // Add transactions table
+      if (filteredTransactions.length > 0) {
+        if (yPosition > pageHeight - 60) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Recent Transactions', 20, yPosition);
+        yPosition += 8;
+
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+
+        // Table headers
+        pdf.text('Date', 20, yPosition);
+        pdf.text('Category', 50, yPosition);
+        pdf.text('Type', 100, yPosition);
+        pdf.text('Amount', 130, yPosition);
+        pdf.text('Description', 160, yPosition);
+        yPosition += 6;
+
+        // Draw line under headers
+        pdf.line(20, yPosition - 2, 190, yPosition - 2);
+        yPosition += 2;
+
+        // Show last 20 transactions
+        const recentTransactions = filteredTransactions
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 20);
+
+        recentTransactions.forEach((tx) => {
+          if (yPosition > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+
+          const txDate = parseDate(tx.date);
+          pdf.text(txDate ? format(txDate, 'MM/dd') : 'Invalid', 20, yPosition);
+          pdf.text(tx.category.substring(0, 15), 50, yPosition);
+          pdf.text(tx.type, 100, yPosition);
+          pdf.text(formatCurrency(tx.amount), 130, yPosition);
+          pdf.text((tx.description || '').substring(0, 20), 160, yPosition);
+          yPosition += 5;
+        });
+      }
+
+      // Add footer
+      const totalPages = pdf.internal.pages.length - 1;
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Generated on ${format(new Date(), 'MMM dd, yyyy HH:mm')}`, 20, pageHeight - 10);
+        pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 30, pageHeight - 10);
+      }
+
+      // Save the PDF
+      const fileName = `financial-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      pdf.save(fileName);
+
+      toast({
+        title: 'PDF Generated',
+        description: `Your financial report has been downloaded as ${fileName}`,
+        variant: 'default',
+      });
+
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast({
+        title: 'PDF Export Failed',
+        description: 'There was an error generating the PDF. Please try again or use CSV export.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Filter transactions by period AND advanced filters

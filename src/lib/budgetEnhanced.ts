@@ -2,15 +2,25 @@
 import { CategoryBudget, SavingsGoal, Achievement, BudgetStats, BudgetStatus, BudgetStatusInfo } from '../types/budget';
 import { Category } from './categories';
 import { Transaction } from './storage';
+import { auth } from './firebase';
 
-const CATEGORY_BUDGETS_KEY = 'category-budgets';
-const SAVINGS_GOALS_KEY = 'savings-goals';
+// Storage Keys
+const CATEGORY_BUDGETS_KEY = 'categoryBudgets';
+const SAVINGS_GOALS_KEY = 'savingsGoals';
 const ACHIEVEMENTS_KEY = 'achievements';
-const STREAK_KEY = 'budget-streak';
+const STREAK_KEY = 'transactionStreak';
 
 // Category Budget Management
 export function getCategoryBudgets(month?: string): CategoryBudget[] {
+  const uid = auth?.currentUser?.uid;
   const currentMonth = month || getCurrentMonth();
+  
+  // For authenticated users, return empty array (new users start fresh)
+  if (uid) {
+    return [];
+  }
+  
+  // Only use localStorage for non-authenticated users
   try {
     const saved = localStorage.getItem(`${CATEGORY_BUDGETS_KEY}-${currentMonth}`);
     return saved ? JSON.parse(saved) : [];
@@ -74,6 +84,14 @@ export function updateCategorySpending(transactions: Transaction[], categories: 
 
 // Savings Goals Management
 export function getSavingsGoals(): SavingsGoal[] {
+  const uid = auth?.currentUser?.uid;
+  
+  // For authenticated users, return empty array (new users start fresh)
+  if (uid) {
+    return [];
+  }
+  
+  // Only use localStorage for non-authenticated users
   try {
     const saved = localStorage.getItem(SAVINGS_GOALS_KEY);
     return saved ? JSON.parse(saved) : [];
@@ -117,6 +135,14 @@ export function deleteSavingsGoal(id: string): void {
 
 // Achievement System
 export function getAchievements(): Achievement[] {
+  const uid = auth?.currentUser?.uid;
+  
+  // For authenticated users, return default achievements (new users start fresh)
+  if (uid) {
+    return getDefaultAchievements();
+  }
+  
+  // Only use localStorage for non-authenticated users
   try {
     const saved = localStorage.getItem(ACHIEVEMENTS_KEY);
     return saved ? JSON.parse(saved) : getDefaultAchievements();

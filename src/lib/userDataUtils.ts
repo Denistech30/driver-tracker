@@ -19,9 +19,24 @@ export function clearLocalStorageForNewUser(): void {
       localStorage.setItem('theme', currentTheme);
     }
     
-    // Clear budget data
+    // Clear budget data (all budget keys)
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('budget-')) {
+        localStorage.removeItem(key);
+      }
+    });
     localStorage.removeItem('budget');
     localStorage.removeItem('budgetMonthly');
+    
+    // Clear enhanced budget features
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('categoryBudgets-')) {
+        localStorage.removeItem(key);
+      }
+    });
+    localStorage.removeItem('savingsGoals');
+    localStorage.removeItem('achievements');
+    localStorage.removeItem('transactionStreak');
     
     // Clear offline sync queue (start fresh)
     localStorage.removeItem('offline-sync-queue');

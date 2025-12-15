@@ -11,11 +11,16 @@ import emailjs from '@emailjs/browser';
 //    - {{recovery_code}} : The 8-digit recovery code
 //    - {{app_name}} : The name of the app ("Xpense")
 //    - {{valid_for}} : How long the code is valid for ("15 minutes")
-// 4. Replace these constants with your actual EmailJS credentials
+// 4. Set these environment variables in your deployment platform
 // ------------------------------------------------------------------------
-const EMAIL_SERVICE_ID = 'service_xjslyav'; // your EmailJS service ID
-const EMAIL_TEMPLATE_ID = 'template_j362ih6'; // your EmailJS template ID
-const EMAIL_PUBLIC_KEY = 'sTrNySyVA9CKh2ESw'; // your EmailJS public key
+const EMAIL_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const EMAIL_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+const EMAIL_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+// Check if EmailJS is properly configured
+const isEmailJSConfigured = Boolean(
+  EMAIL_SERVICE_ID && EMAIL_TEMPLATE_ID && EMAIL_PUBLIC_KEY
+);
 
 // Check if we have an internet connection
 export const checkInternetConnection = async (): Promise<boolean> => {
@@ -45,7 +50,13 @@ export const sendRecoveryEmail = async (
   recoveryCode: string
 ): Promise<boolean> => {
   try {
-    // First check if we have internet connection
+    // Check if EmailJS is properly configured
+    if (!isEmailJSConfigured) {
+      console.error('EmailJS not configured. Please set VITE_EMAILJS_* environment variables.');
+      throw new Error('Email service not configured. Please contact support.');
+    }
+
+    // Check internet connection
     const isOnline = await checkInternetConnection();
     
     if (!isOnline) {
@@ -107,5 +118,22 @@ export const sendRecoveryEmail = async (
 
 // Initialize EmailJS (call this once when your app starts)
 export const initEmailService = () => {
-  emailjs.init(EMAIL_PUBLIC_KEY);
+  if (!isEmailJSConfigured) {
+    console.warn('EmailJS not configured. Email recovery features will not work.');
+    return false;
+  }
+  
+  try {
+    emailjs.init(EMAIL_PUBLIC_KEY);
+    console.log('EmailJS initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize EmailJS:', error);
+    return false;
+  }
+};
+
+// Check if email service is available
+export const isEmailServiceAvailable = (): boolean => {
+  return isEmailJSConfigured;
 };

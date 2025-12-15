@@ -52,24 +52,43 @@ function teardownListener() {
   }
 }
 
-export function getTransactions(): Transaction[] {
-  // Ensure Firestore listener is set for current user
-  ensureListener();
-  
-  const uid = auth?.currentUser?.uid;
-  
-  // If user is authenticated, only return Firestore data (don't mix with localStorage)
-  if (uid) {
-    return cachedTransactions; // Return empty array for new users until Firestore loads
-  }
-  
-  // Only use localStorage for non-authenticated users
+// Helper function to get localStorage transactions (for offline support)
+function getLocalStorageTransactions(): Transaction[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];
   } catch {
     return [];
   }
+}
+
+// Helper function to save to localStorage (for offline support)
+function saveToLocalStorage(transactions: Transaction[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  } catch (error) {
+    console.error('Failed to save to localStorage:', error);
+  }
+}
+
+export function getTransactions(): Transaction[] {
+  // Ensure Firestore listener is set for current user
+  ensureListener();
+  
+  const uid = auth?.currentUser?.uid;
+  
+  // If user is authenticated, prefer Firestore data but fallback to localStorage for offline
+  if (uid) {
+    // If we have Firestore data, use it
+    if (cachedTransactions.length > 0) {
+      return cachedTransactions;
+    }
+    // If no Firestore data yet, check localStorage for offline transactions
+    return getLocalStorageTransactions();
+  }
+  
+  // Only use localStorage for non-authenticated users
+  return getLocalStorageTransactions();
 }
 
 export function addTransaction(transaction: Omit<Transaction, 'id'>): void {
@@ -80,9 +99,9 @@ export function addTransaction(transaction: Omit<Transaction, 'id'>): void {
     const newTransaction: Transaction = { ...transaction, id };
     
     // Always save to localStorage first (for offline support)
-    const transactions = getTransactions();
+    const transactions = getLocalStorageTransactions();
     transactions.push(newTransaction);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    saveToLocalStorage(transactions);
     
     if (uid && isOnline() && auth && repoUpsert) {
       // Write to Firestore if online and authenticated
@@ -119,9 +138,9 @@ export function updateTransaction(updatedTransaction: Transaction): void {
     const uid = auth?.currentUser?.uid;
     
     // Always update localStorage first (for offline support)
-    let transactions = getTransactions();
+    let transactions = getLocalStorageTransactions();
     transactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    saveToLocalStorage(transactions);
     
     if (uid && isOnline() && auth && repoUpdate) {
       // Update in Firestore if online and authenticated
@@ -148,9 +167,9 @@ export function deleteTransaction(id: string): void {
     const uid = auth?.currentUser?.uid;
     
     // Always delete from localStorage first (for offline support)
-    const transactions = getTransactions();
+    const transactions = getLocalStorageTransactions();
     const updated = transactions.filter((t) => t.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    saveToLocalStorage(updated);
     
     if (uid && isOnline() && auth && repoDelete) {
       // Delete from Firestore if online and authenticated
